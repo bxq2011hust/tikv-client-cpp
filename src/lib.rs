@@ -6,6 +6,7 @@ use std::ops;
 use anyhow::Result;
 use cxx::{CxxString, CxxVector};
 use futures::executor::block_on;
+use tikv_client::TransactionOptions;
 
 use self::ffi::*;
 
@@ -35,6 +36,7 @@ mod ffi {
     extern "Rust" {
         type TransactionClient;
         type Transaction;
+        type Snapshot;
 
         fn transaction_client_new(
             pd_endpoints: &CxxVector<CxxString>,
@@ -46,7 +48,8 @@ mod ffi {
             client: &TransactionClient,
         ) -> Result<Box<Transaction>>;
 
-        fn transaction_get(transaction: &Transaction, key: &CxxString) -> Result<OptionalValue>;
+        fn transaction_get(transaction: &mut Transaction, key: &CxxString)
+            -> Result<OptionalValue>;
 
         fn transaction_get_for_update(
             transaction: &mut Transaction,
@@ -90,6 +93,34 @@ mod ffi {
         fn transaction_delete(transaction: &mut Transaction, key: &CxxString) -> Result<()>;
 
         fn transaction_commit(transaction: &mut Transaction) -> Result<()>;
+
+        fn snapshot_new(client: &TransactionClient) -> Result<Box<Snapshot>>;
+
+        fn snapshot_get(snapshot: &mut Snapshot, key: &CxxString) -> Result<OptionalValue>;
+
+        fn snapshot_batch_get(
+            snapshot: &mut Snapshot,
+            keys: &CxxVector<CxxString>,
+        ) -> Result<Vec<KvPair>>;
+
+        fn snapshot_scan(
+            snapshot: &mut Snapshot,
+            start: &CxxString,
+            start_bound: Bound,
+            end: &CxxString,
+            end_bound: Bound,
+            limit: u32,
+        ) -> Result<Vec<KvPair>>;
+
+        fn snapshot_scan_keys(
+            snapshot: &mut Snapshot,
+            start: &CxxString,
+            start_bound: Bound,
+            end: &CxxString,
+            end_bound: Bound,
+            limit: u32,
+        ) -> Result<Vec<Key>>;
+
     }
 }
 
@@ -103,6 +134,11 @@ struct Transaction {
     inner: tikv_client::Transaction,
 }
 
+#[repr(transparent)]
+struct Snapshot {
+    inner: tikv_client::Snapshot,
+}
+
 fn transaction_client_new(pd_endpoints: &CxxVector<CxxString>) -> Result<Box<TransactionClient>> {
     env_logger::init();
 
@@ -112,7 +148,7 @@ fn transaction_client_new(pd_endpoints: &CxxVector<CxxString>) -> Result<Box<Tra
         .collect::<std::result::Result<Vec<_>, _>>()?;
 
     Ok(Box::new(TransactionClient {
-        inner: block_on(tikv_client::TransactionClient::new(pd_endpoints))?,
+        inner: block_on(tikv_client::TransactionClient::new(pd_endpoints, None))?,
     }))
 }
 
@@ -128,7 +164,7 @@ fn transaction_client_begin_pessimistic(client: &TransactionClient) -> Result<Bo
     }))
 }
 
-fn transaction_get(transaction: &Transaction, key: &CxxString) -> Result<OptionalValue> {
+fn transaction_get(transaction: &mut Transaction, key: &CxxString) -> Result<OptionalValue> {
     match block_on(transaction.inner.get(key.as_bytes().to_vec()))? {
         Some(value) => Ok(OptionalValue {
             is_none: false,
@@ -257,4 +293,70 @@ fn to_bound_range(
         _ => panic!("unexpected bound"),
     };
     tikv_client::BoundRange::from((start_bound, end_bound))
+}
+
+fn snapshot_new(client: &TransactionClient) -> Result<Box<Snapshot>> {
+    let timestamp = block_on(client.inner.current_timestamp())?;
+    Ok(Box::new(Snapshot {
+        inner: client
+            .inner
+            .snapshot(timestamp, TransactionOptions::new_optimistic()),
+    }))
+}
+
+fn snapshot_get(snapshot: &mut Snapshot, key: &CxxString) -> Result<OptionalValue> {
+    match block_on(snapshot.inner.get(key.as_bytes().to_vec()))? {
+        Some(value) => Ok(OptionalValue {
+            is_none: false,
+            value,
+        }),
+        None => Ok(OptionalValue {
+            is_none: true,
+            value: Vec::new(),
+        }),
+    }
+}
+
+fn snapshot_batch_get(snapshot: &mut Snapshot, keys: &CxxVector<CxxString>) -> Result<Vec<KvPair>> {
+    let keys = keys.iter().map(|key| key.as_bytes().to_vec());
+    let kv_pairs = block_on(snapshot.inner.batch_get(keys))?
+        .map(|tikv_client::KvPair(key, value)| KvPair {
+            key: key.into(),
+            value,
+        })
+        .collect();
+    Ok(kv_pairs)
+}
+
+fn snapshot_scan(
+    snapshot: &mut Snapshot,
+    start: &CxxString,
+    start_bound: Bound,
+    end: &CxxString,
+    end_bound: Bound,
+    limit: u32,
+) -> Result<Vec<KvPair>> {
+    let range = to_bound_range(start, start_bound, end, end_bound);
+    let kv_pairs = block_on(snapshot.inner.scan(range, limit))?
+        .map(|tikv_client::KvPair(key, value)| KvPair {
+            key: key.into(),
+            value,
+        })
+        .collect();
+    Ok(kv_pairs)
+}
+
+fn snapshot_scan_keys(
+    snapshot: &mut Snapshot,
+    start: &CxxString,
+    start_bound: Bound,
+    end: &CxxString,
+    end_bound: Bound,
+    limit: u32,
+) -> Result<Vec<Key>> {
+    let range = to_bound_range(start, start_bound, end, end_bound);
+    let keys = block_on(snapshot.inner.scan_keys(range, limit))?
+        .map(|key| Key { key: key.into() })
+        .collect();
+    Ok(keys)
 }
