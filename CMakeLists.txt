@@ -11,6 +11,10 @@ else ()
     set(TARGET_DIR "release")
 endif ()
 
+if (OPENSSL_DIR)
+    set(CARGO_CMD OPENSSL_DIR=${OPENSSL_DIR} ${CARGO_CMD})
+endif()
+
 set(RUST_PART_LIB "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_DIR}/libtikvrust.a")
 set(RUST_PART_CXX "${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/client-cpp/src/lib.rs.cc")
 set(RUST_PART_H "${CMAKE_CURRENT_BINARY_DIR}/cxxbridge/client-cpp/src/lib.rs.h")
@@ -35,22 +39,23 @@ write_basic_package_version_file(
     COMPATIBILITY AnyNewerVersion
 )
 
-install(TARGETS tikvcpp 
-        EXPORT tikvcppTargets 
-        LIBRARY DESTINATION lib
-        PUBLIC_HEADER DESTINATION include/tikv
+include(GNUInstallDirs)
+install(TARGETS tikvcpp
+        EXPORT tikvcppTargets
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/tikv"
         )
 
-install(FILES ${RUST_PART_LIB} DESTINATION lib)
+install(FILES ${RUST_PART_LIB} DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 
 install(EXPORT tikvcppTargets
         FILE tikvcppTargets.cmake
         NAMESPACE tikvcpp::
-        DESTINATION lib/cmake/tikvcpp
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/tikvcpp"
         )
 
 configure_file(tikvcppConfig.cmake.in tikvcppConfig.cmake @ONLY)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tikvcppConfig.cmake"
                 "${CMAKE_CURRENT_BINARY_DIR}/tikvcppConfigVersion.cmake"
-        DESTINATION lib/cmake/tikvcpp
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/tikvcpp"
         )
