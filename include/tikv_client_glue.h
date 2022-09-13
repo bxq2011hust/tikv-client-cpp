@@ -806,6 +806,7 @@ std::size_t align_of() {
 
 struct Key;
 struct KvPair;
+struct PrewriteResult;
 struct OptionalValue;
 enum class Bound : ::std::uint8_t;
 namespace tikv_client_glue {
@@ -832,6 +833,16 @@ struct KvPair final {
   using IsRelocatable = ::std::true_type;
 };
 #endif // CXXBRIDGE1_STRUCT_KvPair
+
+#ifndef CXXBRIDGE1_STRUCT_PrewriteResult
+#define CXXBRIDGE1_STRUCT_PrewriteResult
+struct PrewriteResult final {
+  ::rust::Vec<::std::uint8_t> key;
+  ::std::uint64_t version;
+
+  using IsRelocatable = ::std::true_type;
+};
+#endif // CXXBRIDGE1_STRUCT_PrewriteResult
 
 #ifndef CXXBRIDGE1_STRUCT_OptionalValue
 #define CXXBRIDGE1_STRUCT_OptionalValue
@@ -928,4 +939,12 @@ void transaction_commit(::tikv_client_glue::Transaction &transaction);
 ::rust::Vec<::KvPair> snapshot_scan(::tikv_client_glue::Snapshot &snapshot, const ::std::string &start, ::Bound start_bound, const ::std::string &end, ::Bound end_bound, ::std::uint32_t limit);
 
 ::rust::Vec<::Key> snapshot_scan_keys(::tikv_client_glue::Snapshot &snapshot, const ::std::string &start, ::Bound start_bound, const ::std::string &end, ::Bound end_bound, ::std::uint32_t limit);
+
+::PrewriteResult transaction_prewrite_primary(::tikv_client_glue::Transaction &transaction, const ::std::string &primary_key);
+
+void transaction_prewrite_secondary(::tikv_client_glue::Transaction &transaction, const ::std::string &primary_key, ::std::uint64_t start_ts);
+
+::std::uint64_t transaction_commit_primary(::tikv_client_glue::Transaction &transaction);
+
+void transaction_commit_secondary(::tikv_client_glue::Transaction &transaction, ::std::uint64_t commit_ts) noexcept;
 } // namespace tikv_client_glue

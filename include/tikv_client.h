@@ -29,6 +29,10 @@ public:
     void batch_put(const std::vector<KvPair> &kvs);
     void remove(const std::string &key);
     void commit();
+    std::pair<std::string,uint64_t> prewrite_primary(const std::string &primary_key);
+    void prewrite_secondary(const std::string &primary_key, uint64_t start_ts);
+    uint64_t commit_primary();
+    void commit_secondary(uint64_t commit_ts);
 private:
     ::rust::cxxbridge1::Box<tikv_client_glue::Transaction> _txn;
 };

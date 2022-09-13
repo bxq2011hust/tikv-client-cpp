@@ -6,7 +6,7 @@ use std::ops;
 use anyhow::Result;
 use cxx::{CxxString, CxxVector};
 use futures::executor::block_on;
-use tikv_client::TransactionOptions;
+use tikv_client::{TimestampExt, TransactionOptions};
 
 use self::ffi::*;
 
@@ -19,6 +19,11 @@ mod ffi {
     struct KvPair {
         key: Vec<u8>,
         value: Vec<u8>,
+    }
+
+    struct PrewriteResult {
+        key: Vec<u8>,
+        version: u64,
     }
 
     struct OptionalValue {
@@ -120,6 +125,19 @@ mod ffi {
             end_bound: Bound,
             limit: u32,
         ) -> Result<Vec<Key>>;
+
+        fn transaction_prewrite_primary(
+            transaction: &mut Transaction,
+            primary_key: &CxxString,
+        ) -> Result<PrewriteResult>;
+
+        fn transaction_prewrite_secondary(
+            transaction: &mut Transaction,
+            primary_key: &CxxString,
+            start_ts: u64,
+        ) -> Result<()>;
+        fn transaction_commit_primary(transaction: &mut Transaction) -> Result<u64>;
+        fn transaction_commit_secondary(transaction: &mut Transaction, commit_ts: u64);
 
     }
 }
@@ -272,6 +290,51 @@ fn transaction_delete(transaction: &mut Transaction, key: &CxxString) -> Result<
 fn transaction_commit(transaction: &mut Transaction) -> Result<()> {
     block_on(transaction.inner.commit())?;
     Ok(())
+}
+
+fn transaction_prewrite_primary(
+    transaction: &mut Transaction,
+    primary_key: &CxxString,
+) -> Result<PrewriteResult> {
+    let primary_key = if primary_key.is_empty() {
+        None
+    } else {
+        Some(primary_key.as_bytes().to_vec().into())
+    };
+    match block_on(transaction.inner.prewrite_primary(primary_key)) {
+        Ok((key, ts)) => Ok(PrewriteResult {
+            key: key.into(),
+            version: ts.version(),
+        }),
+        Err(e) => Err(e.into()),
+    }
+}
+
+fn transaction_prewrite_secondary(
+    transaction: &mut Transaction,
+    primary_key: &CxxString,
+    start_ts: u64,
+) -> Result<()> {
+    block_on(transaction.inner.prewrite_secondary(
+        primary_key.as_bytes().to_vec().into(),
+        tikv_client::Timestamp::from_version(start_ts),
+    ))?;
+    Ok(())
+}
+
+fn transaction_commit_primary(transaction: &mut Transaction) -> Result<u64> {
+    match block_on(transaction.inner.commit_primary()) {
+        Ok(ts) => Ok(ts.version()),
+        Err(e) => Err(e.into()),
+    }
+}
+
+fn transaction_commit_secondary(transaction: &mut Transaction, commit_ts: u64) {
+    block_on(
+        transaction
+            .inner
+            .commit_secondary(tikv_client::Timestamp::from_version(commit_ts)),
+    );
 }
 
 fn to_bound_range(
