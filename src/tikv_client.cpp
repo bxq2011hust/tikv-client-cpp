@@ -101,7 +101,7 @@ void Transaction::put(const std::string &key, const std::string &value) {
 void Transaction::batch_put(const std::vector<KvPair> &kvs) {
     for (auto iter = kvs.begin(); iter != kvs.end(); ++iter) {
         transaction_put(*_txn, iter->key, iter->value);
-    } 
+    }
 }
 
 void Transaction::remove(const std::string &key) {
@@ -110,6 +110,54 @@ void Transaction::remove(const std::string &key) {
 
 void Transaction::commit() {
     transaction_commit(*_txn);
+}
+
+
+Snapshot::Snapshot(Box<tikv_client_glue::Snapshot> snapshot) : _snapshot(std::move(snapshot)) {}
+
+std::optional<std::string> Snapshot::get(const std::string &key) {
+    auto val = snapshot_get(*_snapshot, key);
+    if (val.is_none) {
+        return std::nullopt;
+    } else {
+        return std::string{val.value.begin(), val.value.end()};
+    }
+}
+
+std::vector<KvPair> Snapshot::batch_get(const std::vector<std::string> &keys) {
+    auto kv_pairs = snapshot_batch_get(*_snapshot, keys);
+    std::vector<KvPair> result;
+    result.reserve(kv_pairs.size());
+    for (auto iter = kv_pairs.begin(); iter != kv_pairs.end(); ++iter) {
+        result.emplace_back(
+            std::string{(iter->key).begin(), (iter->key).end()},
+            std::string{(iter->value).begin(), (iter->value).end()}
+        );
+    }
+    return result;
+}
+
+std::vector<KvPair> Snapshot::scan(const std::string &start, Bound start_bound, const std::string &end, Bound end_bound, std::uint32_t limit) {
+    auto kv_pairs = snapshot_scan(*_snapshot, start, start_bound, end, end_bound, limit);
+    std::vector<KvPair> result;
+    result.reserve(kv_pairs.size());
+    for (auto iter = kv_pairs.begin(); iter != kv_pairs.end(); ++iter) {
+        result.emplace_back(
+            std::string{(iter->key).begin(), (iter->key).end()},
+            std::string{(iter->value).begin(), (iter->value).end()}
+        );
+    }
+    return result;
+}
+
+std::vector<std::string> Snapshot::scan_keys(const std::string &start, Bound start_bound, const std::string &end, Bound end_bound, std::uint32_t limit) {
+    auto keys = snapshot_scan_keys(*_snapshot, start, start_bound, end, end_bound, limit);
+    std::vector<std::string> result;
+    result.reserve(keys.size());
+    for (auto iter = keys.begin(); iter != keys.end(); ++iter) {
+        result.emplace_back(std::string{(iter->key).begin(), (iter->key).end()});
+    }
+    return result;
 }
 
 }
