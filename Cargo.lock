@@ -177,7 +177,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cxx",
- "env_logger",
  "futures 0.3.24",
  "once_cell",
  "tikv-client",

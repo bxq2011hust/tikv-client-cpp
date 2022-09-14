@@ -169,7 +169,7 @@ struct Snapshot {
 }
 
 fn transaction_client_new(pd_endpoints: &CxxVector<CxxString>) -> Result<Box<TransactionClient>> {
-    env_logger::init();
+    // env_logger::init();
 
     let pd_endpoints = pd_endpoints
         .iter()
