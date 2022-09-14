@@ -6,6 +6,7 @@
 #include "tikv_client_glue.h"
 #include <iostream>
 #include <optional>
+#include <map>
 
 namespace tikv_client {
 
@@ -41,7 +42,7 @@ class Snapshot {
 public:
     Snapshot(::rust::cxxbridge1::Box<tikv_client_glue::Snapshot> snapshot);
     std::optional<std::string> get(const std::string &key);
-    std::vector<KvPair> batch_get(const std::vector<std::string> &keys);
+    std::map<std::string, std::string> batch_get(const std::vector<std::string> &keys);
     std::vector<KvPair> scan(const std::string &start, Bound start_bound, const std::string &end, Bound end_bound, std::uint32_t limit);
     std::vector<std::string> scan_keys(const std::string &start, Bound start_bound, const std::string &end, Bound end_bound, std::uint32_t limit);
 private:

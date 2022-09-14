@@ -183,7 +183,7 @@ fn transaction_client_begin_pessimistic(client: &TransactionClient) -> Result<Bo
 }
 
 fn transaction_get(transaction: &mut Transaction, key: &CxxString) -> Result<OptionalValue> {
-    match block_on(transaction.inner.get(key.as_bytes().to_vec()))? {
+    match block_on(transaction.inner.get(key.as_bytes().to_owned()))? {
         Some(value) => Ok(OptionalValue {
             is_none: false,
             value,
@@ -199,7 +199,7 @@ fn transaction_get_for_update(
     transaction: &mut Transaction,
     key: &CxxString,
 ) -> Result<OptionalValue> {
-    match block_on(transaction.inner.get_for_update(key.as_bytes().to_vec()))? {
+    match block_on(transaction.inner.get_for_update(key.as_bytes().to_owned()))? {
         Some(value) => Ok(OptionalValue {
             is_none: false,
             value,
@@ -215,7 +215,7 @@ fn transaction_batch_get(
     transaction: &mut Transaction,
     keys: &CxxVector<CxxString>,
 ) -> Result<Vec<KvPair>> {
-    let keys = keys.iter().map(|key| key.as_bytes().to_vec());
+    let keys = keys.iter().map(|key| key.as_bytes().to_owned());
     let kv_pairs = block_on(transaction.inner.batch_get(keys))?
         .map(|tikv_client::KvPair(key, value)| KvPair {
             key: key.into(),
@@ -229,7 +229,7 @@ fn transaction_batch_get_for_update(
     _transaction: &mut Transaction,
     _keys: &CxxVector<CxxString>,
 ) -> Result<Vec<KvPair>> {
-    // let keys = keys.iter().map(|key| key.as_bytes().to_vec());
+    // let keys = keys.iter().map(|key| key.as_bytes().to_owned());
     // let kv_pairs = block_on(transaction.inner.batch_get_for_update(keys))?
     //     .map(|tikv_client::KvPair(key, value)| KvPair {
     //         key: key.into(),
@@ -277,13 +277,13 @@ fn transaction_put(transaction: &mut Transaction, key: &CxxString, val: &CxxStri
     block_on(
         transaction
             .inner
-            .put(key.as_bytes().to_vec(), val.as_bytes().to_vec()),
+            .put(key.as_bytes().to_owned(), val.as_bytes().to_owned()),
     )?;
     Ok(())
 }
 
 fn transaction_delete(transaction: &mut Transaction, key: &CxxString) -> Result<()> {
-    block_on(transaction.inner.delete(key.as_bytes().to_vec()))?;
+    block_on(transaction.inner.delete(key.as_bytes().to_owned()))?;
     Ok(())
 }
 
@@ -299,7 +299,7 @@ fn transaction_prewrite_primary(
     let primary_key = if primary_key.is_empty() {
         None
     } else {
-        Some(primary_key.as_bytes().to_vec().into())
+        Some(primary_key.as_bytes().to_owned().into())
     };
     match block_on(transaction.inner.prewrite_primary(primary_key)) {
         Ok((key, ts)) => Ok(PrewriteResult {
@@ -316,7 +316,7 @@ fn transaction_prewrite_secondary(
     start_ts: u64,
 ) -> Result<()> {
     block_on(transaction.inner.prewrite_secondary(
-        primary_key.as_bytes().to_vec().into(),
+        primary_key.as_bytes().to_owned().into(),
         tikv_client::Timestamp::from_version(start_ts),
     ))?;
     Ok(())
@@ -344,14 +344,14 @@ fn to_bound_range(
     end_bound: Bound,
 ) -> tikv_client::BoundRange {
     let start_bound = match start_bound {
-        Bound::Included => ops::Bound::Included(start.as_bytes().to_vec()),
-        Bound::Excluded => ops::Bound::Excluded(start.as_bytes().to_vec()),
+        Bound::Included => ops::Bound::Included(start.as_bytes().to_owned()),
+        Bound::Excluded => ops::Bound::Excluded(start.as_bytes().to_owned()),
         Bound::Unbounded => ops::Bound::Unbounded,
         _ => panic!("unexpected bound"),
     };
     let end_bound = match end_bound {
-        Bound::Included => ops::Bound::Included(end.as_bytes().to_vec()),
-        Bound::Excluded => ops::Bound::Excluded(end.as_bytes().to_vec()),
+        Bound::Included => ops::Bound::Included(end.as_bytes().to_owned()),
+        Bound::Excluded => ops::Bound::Excluded(end.as_bytes().to_owned()),
         Bound::Unbounded => ops::Bound::Unbounded,
         _ => panic!("unexpected bound"),
     };
@@ -368,7 +368,7 @@ fn snapshot_new(client: &TransactionClient) -> Result<Box<Snapshot>> {
 }
 
 fn snapshot_get(snapshot: &mut Snapshot, key: &CxxString) -> Result<OptionalValue> {
-    match block_on(snapshot.inner.get(key.as_bytes().to_vec()))? {
+    match block_on(snapshot.inner.get(key.as_bytes().to_owned()))? {
         Some(value) => Ok(OptionalValue {
             is_none: false,
             value,
@@ -381,7 +381,7 @@ fn snapshot_get(snapshot: &mut Snapshot, key: &CxxString) -> Result<OptionalValu
 }
 
 fn snapshot_batch_get(snapshot: &mut Snapshot, keys: &CxxVector<CxxString>) -> Result<Vec<KvPair>> {
-    let keys = keys.iter().map(|key| key.as_bytes().to_vec());
+    let keys = keys.iter().map(|key| key.as_bytes().to_owned());
     let kv_pairs = block_on(snapshot.inner.batch_get(keys))?
         .map(|tikv_client::KvPair(key, value)| KvPair {
             key: key.into(),

@@ -151,14 +151,13 @@ std::optional<std::string> Snapshot::get(const std::string &key) {
   }
 }
 
-std::vector<KvPair> Snapshot::batch_get(const std::vector<std::string> &keys) {
+std::map<std::string, std::string>
+Snapshot::batch_get(const std::vector<std::string> &keys) {
   auto kv_pairs = snapshot_batch_get(*_snapshot, keys);
-  std::vector<KvPair> result;
-  result.reserve(kv_pairs.size());
+  std::map<std::string, std::string> result;
   for (auto iter = kv_pairs.begin(); iter != kv_pairs.end(); ++iter) {
-    result.emplace_back(
-        std::string{(iter->key).begin(), (iter->key).end()},
-        std::string{(iter->value).begin(), (iter->value).end()});
+    result[std::string{(iter->key).begin(), (iter->key).end()}] =
+        std::string{(iter->value).begin(), (iter->value).end()};
   }
   return result;
 }
