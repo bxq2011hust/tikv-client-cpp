@@ -53,6 +53,7 @@ public:
     TransactionClient(const std::vector<std::string> &pd_endpoints);
     Transaction begin();
     Transaction begin_pessimistic();
+    Snapshot snapshot();
 private:
     ::rust::cxxbridge1::Box<tikv_client_glue::TransactionClient> _client;
 };

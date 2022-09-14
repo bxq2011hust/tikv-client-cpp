@@ -22,6 +22,10 @@ Transaction TransactionClient::begin_pessimistic() {
   return Transaction(transaction_client_begin_pessimistic(*_client));
 }
 
+Snapshot TransactionClient::snapshot() {
+  return Snapshot(snapshot_new(*_client));
+}
+
 Transaction::Transaction(Box<tikv_client_glue::Transaction> txn)
     : _txn(std::move(txn)) {}
 
