@@ -5,7 +5,8 @@ use std::ops;
 
 use anyhow::Result;
 use cxx::{CxxString, CxxVector};
-use futures::executor::block_on;
+// use futures::executor::block_on;
+use async_std::task::block_on;
 use tikv_client::{TimestampExt, TransactionOptions};
 
 use self::ffi::*;
