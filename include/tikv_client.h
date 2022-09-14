@@ -5,6 +5,7 @@
 
 #include "tikv_client_glue.h"
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <map>
 
@@ -53,6 +54,7 @@ class TransactionClient {
 public:
     TransactionClient(const std::vector<std::string> &pd_endpoints);
     Transaction begin();
+    std::shared_ptr<Transaction> new_optimistic_transaction();
     Transaction begin_pessimistic();
     Snapshot snapshot();
 private:

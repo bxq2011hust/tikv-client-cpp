@@ -18,6 +18,10 @@ Transaction TransactionClient::begin() {
   return Transaction(transaction_client_begin(*_client));
 }
 
+std::shared_ptr<Transaction> TransactionClient::new_optimistic_transaction() {
+  return std::make_shared<Transaction>(transaction_client_begin(*_client));
+}
+
 Transaction TransactionClient::begin_pessimistic() {
   return Transaction(transaction_client_begin_pessimistic(*_client));
 }
