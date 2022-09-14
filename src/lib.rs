@@ -5,11 +5,20 @@ use std::ops;
 
 use anyhow::Result;
 use cxx::{CxxString, CxxVector};
-// use futures::executor::block_on;
-use async_std::task::block_on;
+// use futures::executor::TOKIO_RUNTIME.block_on;
+use tokio::runtime::Runtime;
+use once_cell::sync::Lazy;
 use tikv_client::{TimestampExt, TransactionOptions};
 
 use self::ffi::*;
+
+static TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("Failed to create TOKIO_RUNTIME")
+});
+
 
 #[cxx::bridge]
 mod ffi {
@@ -168,24 +177,24 @@ fn transaction_client_new(pd_endpoints: &CxxVector<CxxString>) -> Result<Box<Tra
         .collect::<std::result::Result<Vec<_>, _>>()?;
 
     Ok(Box::new(TransactionClient {
-        inner: block_on(tikv_client::TransactionClient::new(pd_endpoints, None))?,
+        inner: TOKIO_RUNTIME.block_on(tikv_client::TransactionClient::new(pd_endpoints, None))?,
     }))
 }
 
 fn transaction_client_begin(client: &TransactionClient) -> Result<Box<Transaction>> {
     Ok(Box::new(Transaction {
-        inner: block_on(client.inner.begin_optimistic())?,
+        inner: TOKIO_RUNTIME.block_on(client.inner.begin_optimistic())?,
     }))
 }
 
 fn transaction_client_begin_pessimistic(client: &TransactionClient) -> Result<Box<Transaction>> {
     Ok(Box::new(Transaction {
-        inner: block_on(client.inner.begin_pessimistic())?,
+        inner: TOKIO_RUNTIME.block_on(client.inner.begin_pessimistic())?,
     }))
 }
 
 fn transaction_get(transaction: &mut Transaction, key: &CxxString) -> Result<OptionalValue> {
-    match block_on(transaction.inner.get(key.as_bytes().to_owned()))? {
+    match TOKIO_RUNTIME.block_on(transaction.inner.get(key.as_bytes().to_owned()))? {
         Some(value) => Ok(OptionalValue {
             is_none: false,
             value,
@@ -201,7 +210,7 @@ fn transaction_get_for_update(
     transaction: &mut Transaction,
     key: &CxxString,
 ) -> Result<OptionalValue> {
-    match block_on(transaction.inner.get_for_update(key.as_bytes().to_owned()))? {
+    match TOKIO_RUNTIME.block_on(transaction.inner.get_for_update(key.as_bytes().to_owned()))? {
         Some(value) => Ok(OptionalValue {
             is_none: false,
             value,
@@ -218,7 +227,7 @@ fn transaction_batch_get(
     keys: &CxxVector<CxxString>,
 ) -> Result<Vec<KvPair>> {
     let keys = keys.iter().map(|key| key.as_bytes().to_owned());
-    let kv_pairs = block_on(transaction.inner.batch_get(keys))?
+    let kv_pairs = TOKIO_RUNTIME.block_on(transaction.inner.batch_get(keys))?
         .map(|tikv_client::KvPair(key, value)| KvPair {
             key: key.into(),
             value,
@@ -232,7 +241,7 @@ fn transaction_batch_get_for_update(
     _keys: &CxxVector<CxxString>,
 ) -> Result<Vec<KvPair>> {
     // let keys = keys.iter().map(|key| key.as_bytes().to_owned());
-    // let kv_pairs = block_on(transaction.inner.batch_get_for_update(keys))?
+    // let kv_pairs = TOKIO_RUNTIME.block_on(transaction.inner.batch_get_for_update(keys))?
     //     .map(|tikv_client::KvPair(key, value)| KvPair {
     //         key: key.into(),
     //         value,
@@ -251,7 +260,7 @@ fn transaction_scan(
     limit: u32,
 ) -> Result<Vec<KvPair>> {
     let range = to_bound_range(start, start_bound, end, end_bound);
-    let kv_pairs = block_on(transaction.inner.scan(range, limit))?
+    let kv_pairs = TOKIO_RUNTIME.block_on(transaction.inner.scan(range, limit))?
         .map(|tikv_client::KvPair(key, value)| KvPair {
             key: key.into(),
             value,
@@ -269,14 +278,14 @@ fn transaction_scan_keys(
     limit: u32,
 ) -> Result<Vec<Key>> {
     let range = to_bound_range(start, start_bound, end, end_bound);
-    let keys = block_on(transaction.inner.scan_keys(range, limit))?
+    let keys = TOKIO_RUNTIME.block_on(transaction.inner.scan_keys(range, limit))?
         .map(|key| Key { key: key.into() })
         .collect();
     Ok(keys)
 }
 
 fn transaction_put(transaction: &mut Transaction, key: &CxxString, val: &CxxString) -> Result<()> {
-    block_on(
+    TOKIO_RUNTIME.block_on(
         transaction
             .inner
             .put(key.as_bytes().to_owned(), val.as_bytes().to_owned()),
@@ -285,17 +294,17 @@ fn transaction_put(transaction: &mut Transaction, key: &CxxString, val: &CxxStri
 }
 
 fn transaction_delete(transaction: &mut Transaction, key: &CxxString) -> Result<()> {
-    block_on(transaction.inner.delete(key.as_bytes().to_owned()))?;
+    TOKIO_RUNTIME.block_on(transaction.inner.delete(key.as_bytes().to_owned()))?;
     Ok(())
 }
 
 fn transaction_commit(transaction: &mut Transaction) -> Result<()> {
-    block_on(transaction.inner.commit())?;
+    TOKIO_RUNTIME.block_on(transaction.inner.commit())?;
     Ok(())
 }
 
 fn transaction_rollback(transaction: &mut Transaction) -> Result<()> {
-    block_on(transaction.inner.rollback())?;
+    TOKIO_RUNTIME.block_on(transaction.inner.rollback())?;
     Ok(())
 }
 
@@ -308,7 +317,7 @@ fn transaction_prewrite_primary(
     } else {
         Some(primary_key.as_bytes().to_owned().into())
     };
-    match block_on(transaction.inner.prewrite_primary(primary_key)) {
+    match TOKIO_RUNTIME.block_on(transaction.inner.prewrite_primary(primary_key)) {
         Ok((key, ts)) => Ok(PrewriteResult {
             key: key.into(),
             version: ts.version(),
@@ -322,7 +331,7 @@ fn transaction_prewrite_secondary(
     primary_key: &CxxString,
     start_ts: u64,
 ) -> Result<()> {
-    block_on(transaction.inner.prewrite_secondary(
+    TOKIO_RUNTIME.block_on(transaction.inner.prewrite_secondary(
         primary_key.as_bytes().to_owned().into(),
         tikv_client::Timestamp::from_version(start_ts),
     ))?;
@@ -330,14 +339,14 @@ fn transaction_prewrite_secondary(
 }
 
 fn transaction_commit_primary(transaction: &mut Transaction) -> Result<u64> {
-    match block_on(transaction.inner.commit_primary()) {
+    match TOKIO_RUNTIME.block_on(transaction.inner.commit_primary()) {
         Ok(ts) => Ok(ts.version()),
         Err(e) => Err(e.into()),
     }
 }
 
 fn transaction_commit_secondary(transaction: &mut Transaction, commit_ts: u64) {
-    block_on(
+    TOKIO_RUNTIME.block_on(
         transaction
             .inner
             .commit_secondary(tikv_client::Timestamp::from_version(commit_ts)),
@@ -366,7 +375,7 @@ fn to_bound_range(
 }
 
 fn snapshot_new(client: &TransactionClient) -> Result<Box<Snapshot>> {
-    let timestamp = block_on(client.inner.current_timestamp())?;
+    let timestamp = TOKIO_RUNTIME.block_on(client.inner.current_timestamp())?;
     Ok(Box::new(Snapshot {
         inner: client
             .inner
@@ -375,7 +384,7 @@ fn snapshot_new(client: &TransactionClient) -> Result<Box<Snapshot>> {
 }
 
 fn snapshot_get(snapshot: &mut Snapshot, key: &CxxString) -> Result<OptionalValue> {
-    match block_on(snapshot.inner.get(key.as_bytes().to_owned()))? {
+    match TOKIO_RUNTIME.block_on(snapshot.inner.get(key.as_bytes().to_owned()))? {
         Some(value) => Ok(OptionalValue {
             is_none: false,
             value,
@@ -389,7 +398,7 @@ fn snapshot_get(snapshot: &mut Snapshot, key: &CxxString) -> Result<OptionalValu
 
 fn snapshot_batch_get(snapshot: &mut Snapshot, keys: &CxxVector<CxxString>) -> Result<Vec<KvPair>> {
     let keys = keys.iter().map(|key| key.as_bytes().to_owned());
-    let kv_pairs = block_on(snapshot.inner.batch_get(keys))?
+    let kv_pairs = TOKIO_RUNTIME.block_on(snapshot.inner.batch_get(keys))?
         .map(|tikv_client::KvPair(key, value)| KvPair {
             key: key.into(),
             value,
@@ -407,7 +416,7 @@ fn snapshot_scan(
     limit: u32,
 ) -> Result<Vec<KvPair>> {
     let range = to_bound_range(start, start_bound, end, end_bound);
-    let kv_pairs = block_on(snapshot.inner.scan(range, limit))?
+    let kv_pairs = TOKIO_RUNTIME.block_on(snapshot.inner.scan(range, limit))?
         .map(|tikv_client::KvPair(key, value)| KvPair {
             key: key.into(),
             value,
@@ -425,7 +434,7 @@ fn snapshot_scan_keys(
     limit: u32,
 ) -> Result<Vec<Key>> {
     let range = to_bound_range(start, start_bound, end, end_bound);
-    let keys = block_on(snapshot.inner.scan_keys(range, limit))?
+    let keys = TOKIO_RUNTIME.block_on(snapshot.inner.scan_keys(range, limit))?
         .map(|key| Key { key: key.into() })
         .collect();
     Ok(keys)
