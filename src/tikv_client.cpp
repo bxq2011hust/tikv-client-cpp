@@ -122,6 +122,7 @@ void Transaction::remove(const std::string &key) {
 }
 
 void Transaction::commit() { transaction_commit(*_txn); }
+void Transaction::rollback() { transaction_rollback(*_txn); }
 
 std::pair<std::string, uint64_t>
 Transaction::prewrite_primary(const std::string &primary_key) {

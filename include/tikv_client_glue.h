@@ -930,6 +930,8 @@ void transaction_delete(::tikv_client_glue::Transaction &transaction, const ::st
 
 void transaction_commit(::tikv_client_glue::Transaction &transaction);
 
+void transaction_rollback(::tikv_client_glue::Transaction &transaction);
+
 ::rust::Box<::tikv_client_glue::Snapshot> snapshot_new(const ::tikv_client_glue::TransactionClient &client);
 
 ::OptionalValue snapshot_get(::tikv_client_glue::Snapshot &snapshot, const ::std::string &key);

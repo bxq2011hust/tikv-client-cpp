@@ -98,6 +98,7 @@ mod ffi {
         fn transaction_delete(transaction: &mut Transaction, key: &CxxString) -> Result<()>;
 
         fn transaction_commit(transaction: &mut Transaction) -> Result<()>;
+        fn transaction_rollback(transaction: &mut Transaction) -> Result<()>;
 
         fn snapshot_new(client: &TransactionClient) -> Result<Box<Snapshot>>;
 
@@ -289,6 +290,11 @@ fn transaction_delete(transaction: &mut Transaction, key: &CxxString) -> Result<
 
 fn transaction_commit(transaction: &mut Transaction) -> Result<()> {
     block_on(transaction.inner.commit())?;
+    Ok(())
+}
+
+fn transaction_rollback(transaction: &mut Transaction) -> Result<()> {
+    block_on(transaction.inner.rollback())?;
     Ok(())
 }
 
