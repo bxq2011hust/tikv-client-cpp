@@ -13,6 +13,9 @@ anyhow = "1"
 cxx = "=1.0.75"
 futures = "0.3"
 once_cell = "1.9.0"
+slog = {version = "2.7.0", features = ["max_level_debug", "release_max_level_debug"] }
+slog-async = "2.7.0"
+slog-term = "2.9.0"
 tokio = { version = "1", features = [ "sync", "rt-multi-thread", "macros" ] }
 # env_logger = "0.9"
-tikv-client = { git = "https://github.com/bxq2011hust/tikv-client-rust.git", rev = "b03d0fe4afcb616699ce35a21a43a2b96a1232b9" }
+tikv-client = { git = "https://github.com/bxq2011hust/tikv-client-rust.git", rev = "1b554edd67854b7911fcedeee8d747e764abd8ee" }

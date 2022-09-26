@@ -906,7 +906,9 @@ private:
 };
 #endif // CXXBRIDGE1_STRUCT_tikv_client_glue$Snapshot
 
-::rust::Box<::tikv_client_glue::TransactionClient> transaction_client_new(const ::std::vector<::std::string> &pd_endpoints);
+::rust::Box<::tikv_client_glue::TransactionClient> transaction_client_new(const ::std::vector<::std::string> &pd_endpoints, const ::std::string &logPath);
+
+::rust::Box<::tikv_client_glue::TransactionClient> transaction_client_new_with_config(const ::std::vector<::std::string> &pd_endpoints, const ::std::string &log_path, const ::std::string &ca_path, const ::std::string &cert_path, const ::std::string &key_path, ::std::uint32_t timeout);
 
 ::rust::Box<::tikv_client_glue::Transaction> transaction_client_begin(const ::tikv_client_glue::TransactionClient &client);
 

@@ -1,14 +1,16 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
 use core::panic;
-use std::ops;
+use std::{ops, path::PathBuf, time::Duration};
 
 use anyhow::Result;
 use cxx::{CxxString, CxxVector};
 // use futures::executor::TOKIO_RUNTIME.block_on;
-use tokio::runtime::Runtime;
 use once_cell::sync::Lazy;
+use slog::{o, Drain};
+use std::fs::OpenOptions;
 use tikv_client::{TimestampExt, TransactionOptions};
+use tokio::runtime::Runtime;
 
 use self::ffi::*;
 
@@ -18,7 +20,6 @@ static TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         .build()
         .expect("Failed to create TOKIO_RUNTIME")
 });
-
 
 #[cxx::bridge]
 mod ffi {
@@ -55,6 +56,16 @@ mod ffi {
 
         fn transaction_client_new(
             pd_endpoints: &CxxVector<CxxString>,
+            logPath: &CxxString,
+        ) -> Result<Box<TransactionClient>>;
+
+        fn transaction_client_new_with_config(
+            pd_endpoints: &CxxVector<CxxString>,
+            log_path: &CxxString,
+            ca_path: &CxxString,
+            cert_path: &CxxString,
+            key_path: &CxxString,
+            timeout: u32,
         ) -> Result<Box<TransactionClient>>;
 
         fn transaction_client_begin(client: &TransactionClient) -> Result<Box<Transaction>>;
@@ -168,16 +179,65 @@ struct Snapshot {
     inner: tikv_client::Snapshot,
 }
 
-fn transaction_client_new(pd_endpoints: &CxxVector<CxxString>) -> Result<Box<TransactionClient>> {
+fn create_slog_logger(log_path: &CxxString) -> Result<slog::Logger> {
+    let mut log_path = log_path.to_str()?.to_string();
+    log_path.push_str("/tikv-client.log");
+    let file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(false)
+        .open(log_path)
+        .expect("open log file failed");
+
+    let decorator = slog_term::PlainDecorator::new(file);
+    let drain = slog_term::FullFormat::new(decorator).build().fuse();
+    let drain = slog_async::Async::new(drain).build().fuse();
+    Ok(slog::Logger::root(drain, o!()))
+}
+fn transaction_client_new(
+    pd_endpoints: &CxxVector<CxxString>,
+    log_path: &CxxString,
+) -> Result<Box<TransactionClient>> {
     // env_logger::init();
 
+    let log = create_slog_logger(log_path)?;
     let pd_endpoints = pd_endpoints
         .iter()
         .map(|str| str.to_str().map(ToOwned::to_owned))
         .collect::<std::result::Result<Vec<_>, _>>()?;
 
     Ok(Box::new(TransactionClient {
-        inner: TOKIO_RUNTIME.block_on(tikv_client::TransactionClient::new(pd_endpoints, None))?,
+        inner: TOKIO_RUNTIME
+            .block_on(tikv_client::TransactionClient::new(pd_endpoints, Some(log)))?,
+    }))
+}
+
+fn transaction_client_new_with_config(
+    pd_endpoints: &CxxVector<CxxString>,
+    log_path: &CxxString,
+    ca_path: &CxxString,
+    cert_path: &CxxString,
+    key_path: &CxxString,
+    timeout: u32,
+) -> Result<Box<TransactionClient>> {
+    let config = tikv_client::Config {
+        ca_path: Some(PathBuf::from(ca_path.to_str()?.to_string())),
+        cert_path: Some(PathBuf::from(cert_path.to_str()?.to_string())),
+        key_path: Some(PathBuf::from(key_path.to_str()?.to_string())),
+        timeout: Duration::from_secs(timeout as u64),
+    };
+    let log = create_slog_logger(log_path)?;
+    let pd_endpoints = pd_endpoints
+        .iter()
+        .map(|str| str.to_str().map(ToOwned::to_owned))
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+
+    Ok(Box::new(TransactionClient {
+        inner: TOKIO_RUNTIME.block_on(tikv_client::TransactionClient::new_with_config(
+            pd_endpoints,
+            config,
+            Some(log),
+        ))?,
     }))
 }
 
@@ -227,7 +287,8 @@ fn transaction_batch_get(
     keys: &CxxVector<CxxString>,
 ) -> Result<Vec<KvPair>> {
     let keys = keys.iter().map(|key| key.as_bytes().to_owned());
-    let kv_pairs = TOKIO_RUNTIME.block_on(transaction.inner.batch_get(keys))?
+    let kv_pairs = TOKIO_RUNTIME
+        .block_on(transaction.inner.batch_get(keys))?
         .map(|tikv_client::KvPair(key, value)| KvPair {
             key: key.into(),
             value,
@@ -260,7 +321,8 @@ fn transaction_scan(
     limit: u32,
 ) -> Result<Vec<KvPair>> {
     let range = to_bound_range(start, start_bound, end, end_bound);
-    let kv_pairs = TOKIO_RUNTIME.block_on(transaction.inner.scan(range, limit))?
+    let kv_pairs = TOKIO_RUNTIME
+        .block_on(transaction.inner.scan(range, limit))?
         .map(|tikv_client::KvPair(key, value)| KvPair {
             key: key.into(),
             value,
@@ -278,7 +340,8 @@ fn transaction_scan_keys(
     limit: u32,
 ) -> Result<Vec<Key>> {
     let range = to_bound_range(start, start_bound, end, end_bound);
-    let keys = TOKIO_RUNTIME.block_on(transaction.inner.scan_keys(range, limit))?
+    let keys = TOKIO_RUNTIME
+        .block_on(transaction.inner.scan_keys(range, limit))?
         .map(|key| Key { key: key.into() })
         .collect();
     Ok(keys)
@@ -398,7 +461,8 @@ fn snapshot_get(snapshot: &mut Snapshot, key: &CxxString) -> Result<OptionalValu
 
 fn snapshot_batch_get(snapshot: &mut Snapshot, keys: &CxxVector<CxxString>) -> Result<Vec<KvPair>> {
     let keys = keys.iter().map(|key| key.as_bytes().to_owned());
-    let kv_pairs = TOKIO_RUNTIME.block_on(snapshot.inner.batch_get(keys))?
+    let kv_pairs = TOKIO_RUNTIME
+        .block_on(snapshot.inner.batch_get(keys))?
         .map(|tikv_client::KvPair(key, value)| KvPair {
             key: key.into(),
             value,
@@ -416,7 +480,8 @@ fn snapshot_scan(
     limit: u32,
 ) -> Result<Vec<KvPair>> {
     let range = to_bound_range(start, start_bound, end, end_bound);
-    let kv_pairs = TOKIO_RUNTIME.block_on(snapshot.inner.scan(range, limit))?
+    let kv_pairs = TOKIO_RUNTIME
+        .block_on(snapshot.inner.scan(range, limit))?
         .map(|tikv_client::KvPair(key, value)| KvPair {
             key: key.into(),
             value,
@@ -434,7 +499,8 @@ fn snapshot_scan_keys(
     limit: u32,
 ) -> Result<Vec<Key>> {
     let range = to_bound_range(start, start_bound, end, end_bound);
-    let keys = TOKIO_RUNTIME.block_on(snapshot.inner.scan_keys(range, limit))?
+    let keys = TOKIO_RUNTIME
+        .block_on(snapshot.inner.scan_keys(range, limit))?
         .map(|key| Key { key: key.into() })
         .collect();
     Ok(keys)

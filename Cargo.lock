@@ -179,6 +179,9 @@ dependencies = [
  "cxx",
  "futures 0.3.24",
  "once_cell",
+ "slog",
+ "slog-async",
+ "slog-term",
  "tikv-client",
  "tokio",
 ]
@@ -215,6 +218,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b540bd8bc810d3885c6ea91e2018302f68baba2129ab3e88f32389ee9370880d"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "crossbeam-channel"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c2dd04ddaf88237dc3b8d8f9a3c1004b506b54b3313403944054d23c0870c521"
+dependencies = [
+ "cfg-if",
+ "crossbeam-utils",
+]
+
+[[package]]
+name = "crossbeam-utils"
+version = "0.8.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "51887d4adc7b564537b15adcfb307936f8075dfcd5f00dde9a9f1d29383682bc"
+dependencies = [
+ "cfg-if",
+ "once_cell",
 ]
 
 [[package]]
@@ -1444,6 +1467,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8347046d4ebd943127157b94d63abb990fcf729dc4e9978927fdf4ac3c998d06"
 
 [[package]]
+name = "slog-async"
+version = "2.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "766c59b252e62a34651412870ff55d8c4e6d04df19b43eecb2703e417b097ffe"
+dependencies = [
+ "crossbeam-channel",
+ "slog",
+ "take_mut",
+ "thread_local",
+]
+
+[[package]]
 name = "slog-term"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1488,6 +1523,12 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "take_mut"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f764005d11ee5f36500a149ace24e00e3da98b0158b3e2d53a7495660d3f4d60"
 
 [[package]]
 name = "tempfile"
@@ -1564,7 +1605,7 @@ dependencies = [
 [[package]]
 name = "tikv-client"
 version = "0.1.0"
-source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=b941bcce760fccf90af1c2f72a05c665499165de#b941bcce760fccf90af1c2f72a05c665499165de"
+source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=bcf34c1b6aab6ef66f801cad5cf6b9481783eae3#bcf34c1b6aab6ef66f801cad5cf6b9481783eae3"
 dependencies = [
  "async-recursion",
  "async-trait",
@@ -1583,6 +1624,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "slog",
+ "slog-async",
  "slog-term",
  "thiserror",
  "tikv-client-common",
@@ -1595,7 +1637,7 @@ dependencies = [
 [[package]]
 name = "tikv-client-common"
 version = "0.1.0"
-source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=b941bcce760fccf90af1c2f72a05c665499165de#b941bcce760fccf90af1c2f72a05c665499165de"
+source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=bcf34c1b6aab6ef66f801cad5cf6b9481783eae3#bcf34c1b6aab6ef66f801cad5cf6b9481783eae3"
 dependencies = [
  "futures 0.3.24",
  "grpcio",
@@ -1611,7 +1653,7 @@ dependencies = [
 [[package]]
 name = "tikv-client-pd"
 version = "0.1.0"
-source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=b941bcce760fccf90af1c2f72a05c665499165de#b941bcce760fccf90af1c2f72a05c665499165de"
+source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=bcf34c1b6aab6ef66f801cad5cf6b9481783eae3#bcf34c1b6aab6ef66f801cad5cf6b9481783eae3"
 dependencies = [
  "async-trait",
  "futures 0.3.24",
@@ -1624,7 +1666,7 @@ dependencies = [
 [[package]]
 name = "tikv-client-proto"
 version = "0.1.0"
-source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=b941bcce760fccf90af1c2f72a05c665499165de#b941bcce760fccf90af1c2f72a05c665499165de"
+source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=bcf34c1b6aab6ef66f801cad5cf6b9481783eae3#bcf34c1b6aab6ef66f801cad5cf6b9481783eae3"
 dependencies = [
  "futures 0.3.24",
  "grpcio",
@@ -1638,7 +1680,7 @@ dependencies = [
 [[package]]
 name = "tikv-client-store"
 version = "0.1.0"
-source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=b941bcce760fccf90af1c2f72a05c665499165de#b941bcce760fccf90af1c2f72a05c665499165de"
+source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=bcf34c1b6aab6ef66f801cad5cf6b9481783eae3#bcf34c1b6aab6ef66f801cad5cf6b9481783eae3"
 dependencies = [
  "async-trait",
  "derive-new",
