@@ -18,4 +18,4 @@ slog-async = "2.7.0"
 slog-term = "2.9.0"
 tokio = { version = "1", features = [ "sync", "rt-multi-thread", "macros" ] }
 # env_logger = "0.9"
-tikv-client = { git = "https://github.com/bxq2011hust/tikv-client-rust.git", rev = "1b554edd67854b7911fcedeee8d747e764abd8ee" }
+tikv-client = { git = "https://github.com/bxq2011hust/tikv-client-rust.git", rev = "3907b71bbfe5952cb5507b075d90d1e589a647fe" }

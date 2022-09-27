@@ -33,6 +33,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9a8f622bcf6ff3df478e9deba3e03e4e04b300f8e6a139e192c05fa3490afc7"
 
 [[package]]
+name = "arc-swap"
+version = "1.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "983cd8b9d4b02a6dc6ffa557262eb5858a27a0038ffffe21a0f133eaa819a164"
+
+[[package]]
 name = "async-recursion"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1479,6 +1485,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "slog-scope"
+version = "4.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f95a4b4c3274cd2869549da82b57ccc930859bdbf5bcea0424bc5f140b3c786"
+dependencies = [
+ "arc-swap",
+ "lazy_static",
+ "slog",
+]
+
+[[package]]
 name = "slog-term"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1605,7 +1622,7 @@ dependencies = [
 [[package]]
 name = "tikv-client"
 version = "0.1.0"
-source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=bcf34c1b6aab6ef66f801cad5cf6b9481783eae3#bcf34c1b6aab6ef66f801cad5cf6b9481783eae3"
+source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=3907b71bbfe5952cb5507b075d90d1e589a647fe#3907b71bbfe5952cb5507b075d90d1e589a647fe"
 dependencies = [
  "async-recursion",
  "async-trait",
@@ -1625,6 +1642,7 @@ dependencies = [
  "serde_derive",
  "slog",
  "slog-async",
+ "slog-scope",
  "slog-term",
  "thiserror",
  "tikv-client-common",
@@ -1637,7 +1655,7 @@ dependencies = [
 [[package]]
 name = "tikv-client-common"
 version = "0.1.0"
-source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=bcf34c1b6aab6ef66f801cad5cf6b9481783eae3#bcf34c1b6aab6ef66f801cad5cf6b9481783eae3"
+source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=3907b71bbfe5952cb5507b075d90d1e589a647fe#3907b71bbfe5952cb5507b075d90d1e589a647fe"
 dependencies = [
  "futures 0.3.24",
  "grpcio",
@@ -1653,7 +1671,7 @@ dependencies = [
 [[package]]
 name = "tikv-client-pd"
 version = "0.1.0"
-source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=bcf34c1b6aab6ef66f801cad5cf6b9481783eae3#bcf34c1b6aab6ef66f801cad5cf6b9481783eae3"
+source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=3907b71bbfe5952cb5507b075d90d1e589a647fe#3907b71bbfe5952cb5507b075d90d1e589a647fe"
 dependencies = [
  "async-trait",
  "futures 0.3.24",
@@ -1666,7 +1684,7 @@ dependencies = [
 [[package]]
 name = "tikv-client-proto"
 version = "0.1.0"
-source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=bcf34c1b6aab6ef66f801cad5cf6b9481783eae3#bcf34c1b6aab6ef66f801cad5cf6b9481783eae3"
+source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=3907b71bbfe5952cb5507b075d90d1e589a647fe#3907b71bbfe5952cb5507b075d90d1e589a647fe"
 dependencies = [
  "futures 0.3.24",
  "grpcio",
@@ -1680,7 +1698,7 @@ dependencies = [
 [[package]]
 name = "tikv-client-store"
 version = "0.1.0"
-source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=bcf34c1b6aab6ef66f801cad5cf6b9481783eae3#bcf34c1b6aab6ef66f801cad5cf6b9481783eae3"
+source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=3907b71bbfe5952cb5507b075d90d1e589a647fe#3907b71bbfe5952cb5507b075d90d1e589a647fe"
 dependencies = [
  "async-trait",
  "derive-new",
