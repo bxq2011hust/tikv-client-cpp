@@ -6,9 +6,10 @@ use std::{ops, path::PathBuf, time::Duration};
 use anyhow::Result;
 use cxx::{CxxString, CxxVector};
 // use futures::executor::TOKIO_RUNTIME.block_on;
-use once_cell::sync::Lazy;
+use once_cell::sync::{Lazy, OnceCell};
 use slog::{o, Drain};
 use std::fs::OpenOptions;
+use std::sync::Once;
 use tikv_client::{TimestampExt, TransactionOptions};
 use tokio::runtime::Runtime;
 
@@ -20,6 +21,7 @@ static TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         .build()
         .expect("Failed to create TOKIO_RUNTIME")
 });
+static START: Once = Once::new();
 
 #[cxx::bridge]
 mod ffi {
@@ -192,7 +194,15 @@ fn create_slog_logger(log_path: &CxxString) -> Result<slog::Logger> {
     let decorator = slog_term::PlainDecorator::new(file);
     let drain = slog_term::FullFormat::new(decorator).build().fuse();
     let drain = slog_async::Async::new(drain).build().fuse();
-    Ok(slog::Logger::root(drain, o!()))
+    let logger = slog::Logger::root(drain, o!());
+    static SCOPE_GUARD: OnceCell<slog_scope::GlobalLoggerGuard> = OnceCell::new();
+    #[allow(unused_must_use)]
+    START.call_once(|| {
+        SCOPE_GUARD
+            .set(slog_scope::set_global_logger(logger));
+        slog_stdlog::init().unwrap();
+    });
+    Ok(slog_scope::logger())
 }
 fn transaction_client_new(
     pd_endpoints: &CxxVector<CxxString>,
