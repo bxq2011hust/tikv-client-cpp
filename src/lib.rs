@@ -22,6 +22,7 @@ static TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         .expect("Failed to create TOKIO_RUNTIME")
 });
 static START: Once = Once::new();
+const DEFAULT_CHAN_SIZE : usize = 4096;
 
 #[cxx::bridge]
 mod ffi {
@@ -193,7 +194,7 @@ fn create_slog_logger(log_path: &CxxString) -> Result<slog::Logger> {
 
     let decorator = slog_term::PlainDecorator::new(file);
     let drain = slog_term::FullFormat::new(decorator).build().fuse();
-    let drain = slog_async::Async::new(drain).build().fuse();
+    let drain = slog_async::Async::new(drain).chan_size(DEFAULT_CHAN_SIZE).build().fuse();
     let logger = slog::Logger::root(drain, o!());
     static SCOPE_GUARD: OnceCell<slog_scope::GlobalLoggerGuard> = OnceCell::new();
     #[allow(unused_must_use)]

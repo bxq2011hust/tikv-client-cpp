@@ -1635,7 +1635,7 @@ dependencies = [
 [[package]]
 name = "tikv-client"
 version = "0.1.0"
-source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=612579a4c573f1dee8f448f1f75219cacf069a03#612579a4c573f1dee8f448f1f75219cacf069a03"
+source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=46cec3fde00e9e8f5d12b9e6a2f0abfbc9def8be#46cec3fde00e9e8f5d12b9e6a2f0abfbc9def8be"
 dependencies = [
  "async-recursion",
  "async-trait",
@@ -1667,7 +1667,7 @@ dependencies = [
 [[package]]
 name = "tikv-client-common"
 version = "0.1.0"
-source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=612579a4c573f1dee8f448f1f75219cacf069a03#612579a4c573f1dee8f448f1f75219cacf069a03"
+source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=46cec3fde00e9e8f5d12b9e6a2f0abfbc9def8be#46cec3fde00e9e8f5d12b9e6a2f0abfbc9def8be"
 dependencies = [
  "futures 0.3.24",
  "grpcio",
@@ -1683,7 +1683,7 @@ dependencies = [
 [[package]]
 name = "tikv-client-pd"
 version = "0.1.0"
-source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=612579a4c573f1dee8f448f1f75219cacf069a03#612579a4c573f1dee8f448f1f75219cacf069a03"
+source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=46cec3fde00e9e8f5d12b9e6a2f0abfbc9def8be#46cec3fde00e9e8f5d12b9e6a2f0abfbc9def8be"
 dependencies = [
  "async-trait",
  "futures 0.3.24",
@@ -1696,7 +1696,7 @@ dependencies = [
 [[package]]
 name = "tikv-client-proto"
 version = "0.1.0"
-source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=612579a4c573f1dee8f448f1f75219cacf069a03#612579a4c573f1dee8f448f1f75219cacf069a03"
+source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=46cec3fde00e9e8f5d12b9e6a2f0abfbc9def8be#46cec3fde00e9e8f5d12b9e6a2f0abfbc9def8be"
 dependencies = [
  "futures 0.3.24",
  "grpcio",
@@ -1710,7 +1710,7 @@ dependencies = [
 [[package]]
 name = "tikv-client-store"
 version = "0.1.0"
-source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=612579a4c573f1dee8f448f1f75219cacf069a03#612579a4c573f1dee8f448f1f75219cacf069a03"
+source = "git+https://github.com/bxq2011hust/tikv-client-rust.git?rev=46cec3fde00e9e8f5d12b9e6a2f0abfbc9def8be#46cec3fde00e9e8f5d12b9e6a2f0abfbc9def8be"
 dependencies = [
  "async-trait",
  "derive-new",
