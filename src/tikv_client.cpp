@@ -11,9 +11,10 @@ KvPair::KvPair(std::string &&key, std::string &&value)
     : key(std::move(key)), value(std::move(value)) {}
 
 TransactionClient::TransactionClient(
-    const std::vector<std::string> &pd_endpoints, const std::string &log_path)
-    : _client(
-          tikv_client_glue::transaction_client_new(pd_endpoints, log_path)) {}
+    const std::vector<std::string> &pd_endpoints, const std::string &log_path,
+    uint32_t grpc_timeout)
+    : _client(tikv_client_glue::transaction_client_new(pd_endpoints, log_path,
+                                                       grpc_timeout)) {}
 
 TransactionClient::TransactionClient(
     const std::vector<std::string> &pd_endpoints, const std::string &log_path,

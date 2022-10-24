@@ -10,7 +10,7 @@ use once_cell::sync::{Lazy, OnceCell};
 use slog::{o, Drain};
 use std::fs::OpenOptions;
 use std::sync::Once;
-use tikv_client::{TimestampExt, TransactionOptions};
+use tikv_client::{Config, TimestampExt, TransactionOptions};
 use tokio::runtime::Runtime;
 
 use self::ffi::*;
@@ -22,7 +22,7 @@ static TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         .expect("Failed to create TOKIO_RUNTIME")
 });
 static START: Once = Once::new();
-const DEFAULT_CHAN_SIZE : usize = 4096;
+const DEFAULT_CHAN_SIZE: usize = 4096;
 
 #[cxx::bridge]
 mod ffi {
@@ -60,6 +60,7 @@ mod ffi {
         fn transaction_client_new(
             pd_endpoints: &CxxVector<CxxString>,
             logPath: &CxxString,
+            timeout: u32,
         ) -> Result<Box<TransactionClient>>;
 
         fn transaction_client_new_with_config(
@@ -193,24 +194,32 @@ fn create_slog_logger(log_path: &CxxString) -> Result<slog::Logger> {
         .expect("open log file failed");
 
     let decorator = slog_term::PlainDecorator::new(file);
-    let drain = slog_term::FullFormat::new(decorator).build().fuse();
-    let drain = slog_async::Async::new(drain).chan_size(DEFAULT_CHAN_SIZE).build().fuse();
+    let drain = slog_term::FullFormat::new(decorator)
+        .use_file_location()
+        .build()
+        .fuse();
+    let drain = slog_async::Async::new(drain)
+        .chan_size(DEFAULT_CHAN_SIZE)
+        .build()
+        .fuse();
     let logger = slog::Logger::root(drain, o!());
     static SCOPE_GUARD: OnceCell<slog_scope::GlobalLoggerGuard> = OnceCell::new();
     #[allow(unused_must_use)]
     START.call_once(|| {
-        SCOPE_GUARD
-            .set(slog_scope::set_global_logger(logger));
+        SCOPE_GUARD.set(slog_scope::set_global_logger(logger));
         slog_stdlog::init().unwrap();
     });
     Ok(slog_scope::logger())
 }
+
 fn transaction_client_new(
     pd_endpoints: &CxxVector<CxxString>,
     log_path: &CxxString,
+    timeout: u32,
 ) -> Result<Box<TransactionClient>> {
     // env_logger::init();
-
+    let config = Config::default();
+    let config = config.with_timeout(Duration::from_secs(timeout as u64));
     let log = create_slog_logger(log_path)?;
     let pd_endpoints = pd_endpoints
         .iter()
@@ -218,8 +227,11 @@ fn transaction_client_new(
         .collect::<std::result::Result<Vec<_>, _>>()?;
 
     Ok(Box::new(TransactionClient {
-        inner: TOKIO_RUNTIME
-            .block_on(tikv_client::TransactionClient::new(pd_endpoints, Some(log)))?,
+        inner: TOKIO_RUNTIME.block_on(tikv_client::TransactionClient::new_with_config(
+            pd_endpoints,
+            config,
+            Some(log),
+        ))?,
     }))
 }
 
