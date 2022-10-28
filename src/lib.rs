@@ -6,6 +6,7 @@ use std::{ops, path::PathBuf, time::Duration};
 use anyhow::Result;
 use cxx::{CxxString, CxxVector};
 // use futures::executor::TOKIO_RUNTIME.block_on;
+use chrono;
 use once_cell::sync::{Lazy, OnceCell};
 use slog::{o, Drain};
 use std::fs::OpenOptions;
@@ -185,7 +186,10 @@ struct Snapshot {
 
 fn create_slog_logger(log_path: &CxxString) -> Result<slog::Logger> {
     let mut log_path = log_path.to_str()?.to_string();
-    log_path.push_str("/tikv-client.log");
+    let log_file_name = chrono::Local::now()
+        .format("tikv-client-%Y%m%d%H%M%S.log")
+        .to_string();
+    log_path.push_str(&log_file_name);
     let file = OpenOptions::new()
         .create(true)
         .write(true)

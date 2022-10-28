@@ -18,6 +18,7 @@ slog-async = "2.7.0"
 slog-term = "2.9.0"
 slog-scope = "4.4.0"
 slog-stdlog = "4.1.1"
+chrono = "0.4.22"
 tokio = { version = "1", features = [ "sync", "rt-multi-thread", "macros" ] }
 # env_logger = "0.9"
 tikv-client = { git = "https://github.com/FISCO-BCOS/tikv-client-rust.git", rev = "ab91ba2981306f6d2276229a758d9f06bcbf9802" }
