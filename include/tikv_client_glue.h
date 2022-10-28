@@ -912,6 +912,8 @@ private:
 
 ::rust::Box<::tikv_client_glue::Transaction> transaction_client_begin(const ::tikv_client_glue::TransactionClient &client);
 
+bool client_gc(const ::tikv_client_glue::TransactionClient &client, ::std::uint64_t safeTimpoint);
+
 ::rust::Box<::tikv_client_glue::Transaction> transaction_client_begin_pessimistic(const ::tikv_client_glue::TransactionClient &client);
 
 ::OptionalValue transaction_get(::tikv_client_glue::Transaction &transaction, const ::std::string &key);

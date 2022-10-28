@@ -39,6 +39,10 @@ Snapshot TransactionClient::snapshot() {
   return Snapshot(snapshot_new(*_client));
 }
 
+void TransactionClient::gc(uint64_t safe_point) {
+  client_gc(*_client, safe_point);
+}
+
 Transaction::Transaction(Box<tikv_client_glue::Transaction> txn)
     : _txn(std::move(txn)) {}
 

@@ -72,6 +72,7 @@ public:
   std::shared_ptr<Transaction> new_optimistic_transaction();
   Transaction begin_pessimistic();
   Snapshot snapshot();
+  void gc(uint64_t safe_point);
 
 private:
   ::rust::cxxbridge1::Box<tikv_client_glue::TransactionClient> _client;

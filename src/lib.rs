@@ -74,6 +74,7 @@ mod ffi {
         ) -> Result<Box<TransactionClient>>;
 
         fn transaction_client_begin(client: &TransactionClient) -> Result<Box<Transaction>>;
+        fn client_gc(client: &TransactionClient, safeTimpoint: u64) -> Result<bool>;
 
         fn transaction_client_begin_pessimistic(
             client: &TransactionClient,
@@ -187,7 +188,7 @@ struct Snapshot {
 fn create_slog_logger(log_path: &CxxString) -> Result<slog::Logger> {
     let mut log_path = log_path.to_str()?.to_string();
     let log_file_name = chrono::Local::now()
-        .format("tikv-client-%Y%m%d%H%M%S.log")
+        .format("/tikv-client-%Y%m%d%H%M%S.log")
         .to_string();
     log_path.push_str(&log_file_name);
     let file = OpenOptions::new()
@@ -198,10 +199,7 @@ fn create_slog_logger(log_path: &CxxString) -> Result<slog::Logger> {
         .expect("open log file failed");
 
     let decorator = slog_term::PlainDecorator::new(file);
-    let drain = slog_term::FullFormat::new(decorator)
-        .use_file_location()
-        .build()
-        .fuse();
+    let drain = slog_term::FullFormat::new(decorator).build().fuse();
     let drain = slog_async::Async::new(drain)
         .chan_size(DEFAULT_CHAN_SIZE)
         .build()
@@ -266,6 +264,11 @@ fn transaction_client_new_with_config(
             Some(log),
         ))?,
     }))
+}
+
+fn client_gc(client: &TransactionClient, safepoint: u64) -> Result<bool> {
+    let safepoint = tikv_client::Timestamp::from_version(safepoint);
+    Ok(TOKIO_RUNTIME.block_on(client.inner.gc(safepoint))?)
 }
 
 fn transaction_client_begin(client: &TransactionClient) -> Result<Box<Transaction>> {
