@@ -66,12 +66,18 @@ private:
 
 class TransactionClient {
 public:
-  TransactionClient(const std::vector<std::string> &pd_endpoints, const std::string & log_path, uint32_t grpc_timeout = 3);
-  TransactionClient(const std::vector<std::string> &pd_endpoints, const std::string & log_path, const std::string &ca_path, const std::string &cert_path, const std::string &key_path, uint32_t timeout = 3);
+  TransactionClient(const std::vector<std::string> &pd_endpoints,
+                    const std::string &log_path, uint32_t grpc_timeout = 3);
+  TransactionClient(const std::vector<std::string> &pd_endpoints,
+                    const std::string &log_path, const std::string &ca_path,
+                    const std::string &cert_path, const std::string &key_path,
+                    uint32_t timeout = 3);
   Transaction begin();
   std::shared_ptr<Transaction> new_optimistic_transaction();
   Transaction begin_pessimistic();
-  Snapshot snapshot();
+  std::shared_ptr<Snapshot> snapshot();
+  std::shared_ptr<Snapshot> snapshot(uint64_t timestamp);
+  uint64_t current_timestamp();
   void gc(uint64_t safe_point);
 
 private:

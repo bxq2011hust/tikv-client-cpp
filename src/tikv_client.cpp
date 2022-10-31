@@ -35,8 +35,17 @@ Transaction TransactionClient::begin_pessimistic() {
   return Transaction(transaction_client_begin_pessimistic(*_client));
 }
 
-Snapshot TransactionClient::snapshot() {
-  return Snapshot(snapshot_new(*_client));
+std::shared_ptr<Snapshot> TransactionClient::snapshot() {
+  return std::make_shared<Snapshot>(snapshot_new(*_client));
+}
+
+std::shared_ptr<Snapshot> TransactionClient::snapshot(uint64_t timestamp) {
+  return std::make_shared<Snapshot>(
+      snapshot_new_with_timestamp(*_client, timestamp));
+}
+
+uint64_t TransactionClient::current_timestamp() {
+  return tikv_client_glue::current_timestamp(*_client);
 }
 
 void TransactionClient::gc(uint64_t safe_point) {

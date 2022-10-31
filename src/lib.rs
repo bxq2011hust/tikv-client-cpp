@@ -11,7 +11,7 @@ use once_cell::sync::{Lazy, OnceCell};
 use slog::{o, Drain};
 use std::fs::OpenOptions;
 use std::sync::Once;
-use tikv_client::{Config, TimestampExt, TransactionOptions};
+use tikv_client::{Config, Timestamp, TimestampExt, TransactionOptions};
 use tokio::runtime::Runtime;
 
 use self::ffi::*;
@@ -126,8 +126,13 @@ mod ffi {
 
         fn transaction_commit(transaction: &mut Transaction) -> Result<()>;
         fn transaction_rollback(transaction: &mut Transaction) -> Result<()>;
+        fn current_timestamp(client: &TransactionClient) -> Result<u64>;
 
         fn snapshot_new(client: &TransactionClient) -> Result<Box<Snapshot>>;
+        fn snapshot_new_with_timestamp(
+            client: &TransactionClient,
+            timestamp: u64,
+        ) -> Result<Box<Snapshot>>;
 
         fn snapshot_get(snapshot: &mut Snapshot, key: &CxxString) -> Result<OptionalValue>;
 
@@ -267,7 +272,7 @@ fn transaction_client_new_with_config(
 }
 
 fn client_gc(client: &TransactionClient, safepoint: u64) -> Result<bool> {
-    let safepoint = tikv_client::Timestamp::from_version(safepoint);
+    let safepoint = Timestamp::from_version(safepoint);
     Ok(TOKIO_RUNTIME.block_on(client.inner.gc(safepoint))?)
 }
 
@@ -474,6 +479,23 @@ fn snapshot_new(client: &TransactionClient) -> Result<Box<Snapshot>> {
             .inner
             .snapshot(timestamp, TransactionOptions::new_optimistic()),
     }))
+}
+
+fn snapshot_new_with_timestamp(
+    client: &TransactionClient,
+    timestamp: u64,
+) -> Result<Box<Snapshot>> {
+    let timestamp = tikv_client::Timestamp::from_version(timestamp);
+    Ok(Box::new(Snapshot {
+        inner: client
+            .inner
+            .snapshot(timestamp, TransactionOptions::new_optimistic()),
+    }))
+}
+
+fn current_timestamp(client: &TransactionClient) -> Result<u64> {
+    let timestamp = TOKIO_RUNTIME.block_on(client.inner.current_timestamp())?;
+    Ok(timestamp.version())
 }
 
 fn snapshot_get(snapshot: &mut Snapshot, key: &CxxString) -> Result<OptionalValue> {
