@@ -11,7 +11,7 @@ use once_cell::sync::{Lazy, OnceCell};
 use slog::{o, Drain};
 use std::fs::OpenOptions;
 use std::sync::Once;
-use tikv_client::{Config, Timestamp, TimestampExt, TransactionOptions};
+use tikv_client::{request, Backoff, Config, Timestamp, TimestampExt, TransactionOptions};
 use tokio::runtime::Runtime;
 
 use self::ffi::*;
@@ -75,6 +75,10 @@ mod ffi {
 
         fn transaction_client_begin(client: &TransactionClient) -> Result<Box<Transaction>>;
         fn client_gc(client: &TransactionClient, safeTimpoint: u64) -> Result<bool>;
+        fn transaction_client_begin_pessimistic_with_option(
+            client: &TransactionClient,
+            retry: u32,
+        ) -> Result<Box<Transaction>>;
 
         fn transaction_client_begin_pessimistic(
             client: &TransactionClient,
@@ -204,7 +208,10 @@ fn create_slog_logger(log_path: &CxxString) -> Result<slog::Logger> {
         .expect("open log file failed");
 
     let decorator = slog_term::PlainDecorator::new(file);
-    let drain = slog_term::FullFormat::new(decorator).build().fuse();
+    let drain = slog_term::FullFormat::new(decorator)
+        .use_local_timestamp()
+        .build()
+        .fuse();
     let drain = slog_async::Async::new(drain)
         .chan_size(DEFAULT_CHAN_SIZE)
         .build()
@@ -285,6 +292,22 @@ fn transaction_client_begin(client: &TransactionClient) -> Result<Box<Transactio
 fn transaction_client_begin_pessimistic(client: &TransactionClient) -> Result<Box<Transaction>> {
     Ok(Box::new(Transaction {
         inner: TOKIO_RUNTIME.block_on(client.inner.begin_pessimistic())?,
+    }))
+}
+
+fn transaction_client_begin_pessimistic_with_option(
+    client: &TransactionClient,
+    retry: u32,
+) -> Result<Box<Transaction>> {
+    let options = TransactionOptions::new_optimistic();
+    let mut retry_options = request::RetryOptions::default_optimistic();
+    retry_options.lock_backoff = Backoff::no_jitter_backoff(2, 500, retry);
+    let options = options.retry_options(retry_options);
+    let timestamp = TOKIO_RUNTIME.block_on(client.inner.current_timestamp())?;
+    Ok(Box::new(Transaction {
+        inner: client
+            .inner
+            .new_transaction_with_options(timestamp, options),
     }))
 }
 

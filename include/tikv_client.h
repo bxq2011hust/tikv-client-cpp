@@ -74,6 +74,7 @@ public:
                     uint32_t timeout = 3);
   Transaction begin();
   std::shared_ptr<Transaction> new_optimistic_transaction();
+  std::shared_ptr<Transaction> new_optimistic_transaction(uint32_t retry_limit);
   Transaction begin_pessimistic();
   std::shared_ptr<Snapshot> snapshot();
   std::shared_ptr<Snapshot> snapshot(uint64_t timestamp);

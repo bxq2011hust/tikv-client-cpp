@@ -31,6 +31,10 @@ std::shared_ptr<Transaction> TransactionClient::new_optimistic_transaction() {
   return std::make_shared<Transaction>(transaction_client_begin(*_client));
 }
 
+std::shared_ptr<Transaction> TransactionClient::new_optimistic_transaction(uint32_t retry_limit) {
+  return std::make_shared<Transaction>(transaction_client_begin_pessimistic_with_option(*_client, retry_limit));
+}
+
 Transaction TransactionClient::begin_pessimistic() {
   return Transaction(transaction_client_begin_pessimistic(*_client));
 }
