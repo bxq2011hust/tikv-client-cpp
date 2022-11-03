@@ -13,7 +13,7 @@ anyhow = "1"
 cxx = "=1.0.75"
 futures = "0.3"
 once_cell = "1.9.0"
-slog = {version = "2.7.0", features = ["max_level_debug", "release_max_level_debug"] }
+slog = {version = "2.7.0", features = ["max_level_debug", "release_max_level_warn"] }
 slog-async = "2.7.0"
 slog-term = "2.9.0"
 slog-scope = "4.4.0"
