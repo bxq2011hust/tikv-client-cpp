@@ -209,6 +209,7 @@ dependencies = [
  "chrono",
  "cxx",
  "futures 0.3.24",
+ "log",
  "once_cell",
  "slog",
  "slog-async",
@@ -1734,7 +1735,7 @@ dependencies = [
 [[package]]
 name = "tikv-client"
 version = "0.1.0"
-source = "git+https://github.com/FISCO-BCOS/tikv-client-rust.git?rev=79686f6c9133bcb8bbe44bc5928531af97aa99d6#79686f6c9133bcb8bbe44bc5928531af97aa99d6"
+source = "git+https://github.com/FISCO-BCOS/tikv-client-rust.git?rev=e835d9a72f58064de9ebf27a219425e5556fe6e2#e835d9a72f58064de9ebf27a219425e5556fe6e2"
 dependencies = [
  "async-recursion",
  "async-trait",
@@ -1766,7 +1767,7 @@ dependencies = [
 [[package]]
 name = "tikv-client-common"
 version = "0.1.0"
-source = "git+https://github.com/FISCO-BCOS/tikv-client-rust.git?rev=79686f6c9133bcb8bbe44bc5928531af97aa99d6#79686f6c9133bcb8bbe44bc5928531af97aa99d6"
+source = "git+https://github.com/FISCO-BCOS/tikv-client-rust.git?rev=e835d9a72f58064de9ebf27a219425e5556fe6e2#e835d9a72f58064de9ebf27a219425e5556fe6e2"
 dependencies = [
  "futures 0.3.24",
  "grpcio",
@@ -1782,7 +1783,7 @@ dependencies = [
 [[package]]
 name = "tikv-client-pd"
 version = "0.1.0"
-source = "git+https://github.com/FISCO-BCOS/tikv-client-rust.git?rev=79686f6c9133bcb8bbe44bc5928531af97aa99d6#79686f6c9133bcb8bbe44bc5928531af97aa99d6"
+source = "git+https://github.com/FISCO-BCOS/tikv-client-rust.git?rev=e835d9a72f58064de9ebf27a219425e5556fe6e2#e835d9a72f58064de9ebf27a219425e5556fe6e2"
 dependencies = [
  "async-trait",
  "futures 0.3.24",
@@ -1795,7 +1796,7 @@ dependencies = [
 [[package]]
 name = "tikv-client-proto"
 version = "0.1.0"
-source = "git+https://github.com/FISCO-BCOS/tikv-client-rust.git?rev=79686f6c9133bcb8bbe44bc5928531af97aa99d6#79686f6c9133bcb8bbe44bc5928531af97aa99d6"
+source = "git+https://github.com/FISCO-BCOS/tikv-client-rust.git?rev=e835d9a72f58064de9ebf27a219425e5556fe6e2#e835d9a72f58064de9ebf27a219425e5556fe6e2"
 dependencies = [
  "futures 0.3.24",
  "grpcio",
@@ -1809,7 +1810,7 @@ dependencies = [
 [[package]]
 name = "tikv-client-store"
 version = "0.1.0"
-source = "git+https://github.com/FISCO-BCOS/tikv-client-rust.git?rev=79686f6c9133bcb8bbe44bc5928531af97aa99d6#79686f6c9133bcb8bbe44bc5928531af97aa99d6"
+source = "git+https://github.com/FISCO-BCOS/tikv-client-rust.git?rev=e835d9a72f58064de9ebf27a219425e5556fe6e2#e835d9a72f58064de9ebf27a219425e5556fe6e2"
 dependencies = [
  "async-trait",
  "derive-new",

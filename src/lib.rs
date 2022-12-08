@@ -7,12 +7,14 @@ use anyhow::Result;
 use cxx::{CxxString, CxxVector};
 // use futures::executor::TOKIO_RUNTIME.block_on;
 use chrono;
+use log::debug;
 use once_cell::sync::{Lazy, OnceCell};
 use slog::{o, Drain};
 use std::fs::OpenOptions;
 use std::sync::Once;
 use tikv_client::{request, Backoff, Config, Timestamp, TimestampExt, TransactionOptions};
 use tokio::runtime::Runtime;
+use tokio::time::Instant;
 
 use self::ffi::*;
 
@@ -75,7 +77,7 @@ mod ffi {
 
         fn transaction_client_begin(client: &TransactionClient) -> Result<Box<Transaction>>;
         fn client_gc(client: &TransactionClient, safeTimpoint: u64) -> Result<bool>;
-        fn transaction_client_begin_pessimistic_with_option(
+        fn transaction_client_begin_optimistic_with_option(
             client: &TransactionClient,
             retry: u32,
         ) -> Result<Box<Transaction>>;
@@ -295,7 +297,7 @@ fn transaction_client_begin_pessimistic(client: &TransactionClient) -> Result<Bo
     }))
 }
 
-fn transaction_client_begin_pessimistic_with_option(
+fn transaction_client_begin_optimistic_with_option(
     client: &TransactionClient,
     retry: u32,
 ) -> Result<Box<Transaction>> {
@@ -433,17 +435,24 @@ fn transaction_prewrite_primary(
     transaction: &mut Transaction,
     primary_key: &CxxString,
 ) -> Result<PrewriteResult> {
+    let start = Instant::now();
     let primary_key = if primary_key.is_empty() {
         None
     } else {
         Some(primary_key.as_bytes().to_owned().into())
     };
     match TOKIO_RUNTIME.block_on(transaction.inner.prewrite_primary(primary_key)) {
-        Ok((key, ts)) => Ok(PrewriteResult {
-            key: key.into(),
-            version: ts.version(),
+        Ok((key, ts)) => Ok({
+            debug!("prewrite primary time {:?}", start.elapsed());
+            PrewriteResult {
+                key: key.into(),
+                version: ts.version(),
+            }
         }),
-        Err(e) => Err(e.into()),
+        Err(e) => {
+            debug!("prewrite primary time {:?}", start.elapsed());
+            Err(e.into())
+        }
     }
 }
 
@@ -452,26 +461,34 @@ fn transaction_prewrite_secondary(
     primary_key: &CxxString,
     start_ts: u64,
 ) -> Result<()> {
+    let start = Instant::now();
     TOKIO_RUNTIME.block_on(transaction.inner.prewrite_secondary(
         primary_key.as_bytes().to_owned().into(),
         tikv_client::Timestamp::from_version(start_ts),
     ))?;
+    debug!("prewrite secondary time {:?}", start.elapsed());
     Ok(())
 }
 
 fn transaction_commit_primary(transaction: &mut Transaction) -> Result<u64> {
+    let start = Instant::now();
     match TOKIO_RUNTIME.block_on(transaction.inner.commit_primary()) {
-        Ok(ts) => Ok(ts.version()),
+        Ok(ts) => {
+            debug!("commit primary time {:?}", start.elapsed());
+            Ok(ts.version())
+        }
         Err(e) => Err(e.into()),
     }
 }
 
 fn transaction_commit_secondary(transaction: &mut Transaction, commit_ts: u64) {
+    let start = Instant::now();
     TOKIO_RUNTIME.block_on(
         transaction
             .inner
             .commit_secondary(tikv_client::Timestamp::from_version(commit_ts)),
     );
+    debug!("commit secondary time {:?}", start.elapsed());
 }
 
 fn to_bound_range(
