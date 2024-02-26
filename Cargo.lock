@@ -1607,6 +1607,7 @@ dependencies = [
 [[package]]
 name = "tikv-client"
 version = "0.2.0"
+source = "git+https://github.com/FISCO-BCOS/tikv-client-rust.git?rev=1e3ddb2556274c9360cd159d0ac10a31f473506f#1e3ddb2556274c9360cd159d0ac10a31f473506f"
 dependencies = [
  "async-recursion",
  "async-trait",

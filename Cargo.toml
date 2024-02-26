@@ -28,8 +28,8 @@ slog-stdlog = "4.1.1"
 chrono = "0.4.22"
 tokio = { version = "1", features = ["sync", "rt-multi-thread", "macros"] }
 env_logger = "0.9"
-tikv-client = { path = "../tikv-client-rust" }
-# tikv-client = { git = "https://github.com/FISCO-BCOS/tikv-client-rust.git", rev = "8b628485fee1871cdb15e4fc1cd8ebdbacf90541" }
+# tikv-client = { path = "../tikv-client-rust" }
+tikv-client = { git = "https://github.com/FISCO-BCOS/tikv-client-rust.git", rev = "1e3ddb2556274c9360cd159d0ac10a31f473506f" }
 
 [build-dependencies]
 cxx-build = "1.0.18"

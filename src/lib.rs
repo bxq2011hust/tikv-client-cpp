@@ -234,11 +234,10 @@ struct Transaction {
 }
 
 fn raw_client_new(pd_endpoints: &CxxVector<CxxString>) -> Result<Box<RawKVClient>> {
-    env_logger::builder()
-        .filter_level(log::LevelFilter::Info)
-        .init();
+    // env_logger::builder()
+    //     // .filter_level(log::LevelFilter::Info)
+    //     .init();
     let runtime = Runtime::new().unwrap();
-
     let pd_endpoints = pd_endpoints
         .iter()
         .map(|str| str.to_str().map(ToOwned::to_owned))
@@ -255,53 +254,55 @@ struct Snapshot {
     inner: tikv_client::Snapshot,
 }
 
-// use std::fs::OpenOptions;
-// use chrono;
-// use once_cell::sync::OnceCell;
-// use std::sync::Once;
-// static START: Once = Once::new();
-// const DEFAULT_CHAN_SIZE: usize = 4096;
-// fn create_slog_logger(log_path: &CxxString) -> Result<slog::Logger> {
-//     let mut log_path = log_path.to_str()?.to_string();
-//     let log_file_name = chrono::Local::now()
-//         .format("/tikv-client-%Y%m%d%H%M%S.log")
-//         .to_string();
-//     log_path.push_str(&log_file_name);
-//     let file = OpenOptions::new()
-//         .create(true)
-//         .write(true)
-//         .truncate(false)
-//         .open(log_path)
-//         .expect("open log file failed");
+use chrono;
+use once_cell::sync::OnceCell;
+use std::fs::OpenOptions;
+use std::sync::Once;
+static START: Once = Once::new();
+const DEFAULT_CHAN_SIZE: usize = 4096;
+fn create_slog_logger(log_path: &CxxString) -> Result<bool> {
+    let mut log_path = log_path.to_str()?.to_string();
 
-//     let decorator = slog_term::PlainDecorator::new(file);
-//     let drain = slog_term::FullFormat::new(decorator)
-//         .use_local_timestamp()
-//         .build()
-//         .fuse();
-//     let drain = slog_async::Async::new(drain)
-//         .chan_size(DEFAULT_CHAN_SIZE)
-//         .build()
-//         .fuse();
-//     let logger = slog::Logger::root(drain, o!());
-//     static SCOPE_GUARD: OnceCell<slog_scope::GlobalLoggerGuard> = OnceCell::new();
-//     #[allow(unused_must_use)]
-//     START.call_once(|| {
-//         SCOPE_GUARD.set(slog_scope::set_global_logger(logger));
-//         slog_stdlog::init().unwrap();
-//     });
-//     Ok(slog_scope::logger())
-// }
+    let log_file_name = chrono::Local::now()
+        .format("/tikv-client-%Y%m%d%H%M%S.log")
+        .to_string();
+    log_path.push_str(&log_file_name);
+    // let file = OpenOptions::new()
+    //     .create(true)
+    //     .write(true)
+    //     .truncate(false)
+    //     .open(log_path)
+    //     .expect("open log file failed");
+
+    // let decorator = slog_term::PlainDecorator::new(file);
+    // let drain = slog_term::FullFormat::new(decorator)
+    //     .use_local_timestamp()
+    //     .build()
+    //     .fuse();
+    // let drain = slog_async::Async::new(drain)
+    //     .chan_size(DEFAULT_CHAN_SIZE)
+    //     .build()
+    //     .fuse();
+    // let logger = slog::Logger::root(drain, o!());
+    // static SCOPE_GUARD: OnceCell<slog_scope::GlobalLoggerGuard> = OnceCell::new();
+    // #[allow(unused_must_use)]
+    START.call_once(|| {
+        // SCOPE_GUARD.set(slog_scope::set_global_logger(logger));
+        // slog_stdlog::init().unwrap();
+        env_logger::init();
+    });
+    // Ok(slog_scope::logger())
+    Ok(true)
+}
 
 fn transaction_client_new(
     pd_endpoints: &CxxVector<CxxString>,
-    _log_path: &CxxString,
+    log_path: &CxxString,
     timeout: u32,
 ) -> Result<Box<TransactionClient>> {
-    // env_logger::init();
     let config = Config::default();
     let config = config.with_timeout(Duration::from_secs(timeout as u64));
-    // let log = create_slog_logger(log_path)?;
+    create_slog_logger(log_path)?;
     let pd_endpoints = pd_endpoints
         .iter()
         .map(|str| str.to_str().map(ToOwned::to_owned))
@@ -317,7 +318,7 @@ fn transaction_client_new(
 
 fn transaction_client_new_with_config(
     pd_endpoints: &CxxVector<CxxString>,
-    _log_path: &CxxString,
+    log_path: &CxxString,
     ca_path: &CxxString,
     cert_path: &CxxString,
     key_path: &CxxString,
@@ -329,7 +330,7 @@ fn transaction_client_new_with_config(
         key_path: Some(PathBuf::from(key_path.to_str()?.to_string())),
         timeout: Duration::from_secs(timeout as u64),
     };
-    // let log = create_slog_logger(log_path)?;
+    create_slog_logger(log_path)?;
     let pd_endpoints = pd_endpoints
         .iter()
         .map(|str| str.to_str().map(ToOwned::to_owned))
