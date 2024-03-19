@@ -13,6 +13,9 @@ endif ()
 
 if (OPENSSL_DIR)
     set(CARGO_CMD OPENSSL_DIR=${OPENSSL_DIR} ${CARGO_CMD})
+    if (PROTOC)
+        set(CARGO_CMD PROTOC=${PROTOC} OPENSSL_DIR=${OPENSSL_DIR} ${CARGO_CMD})
+    endif ()
 endif()
 
 set(RUST_PART_LIB "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_DIR}/libtikvrust.a")

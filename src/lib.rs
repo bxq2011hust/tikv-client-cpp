@@ -1,21 +1,19 @@
 // Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.
 
 use core::panic;
-use std::{ops, path::PathBuf};
+use std::{ops, path::PathBuf, time::Duration};
 
 use anyhow::Result;
 use cxx::{CxxString, CxxVector};
-// use futures::executor::block_on;
-use tokio::{
-    runtime::Runtime,
-    time::{timeout, Duration},
-};
 // use futures::executor::TOKIO_RUNTIME.block_on;
+use chrono;
 use log::debug;
-use once_cell::sync::Lazy;
-// use slog::{o, Drain};
-
+use once_cell::sync::{Lazy, OnceCell};
+use slog::{o, Drain};
+use std::fs::OpenOptions;
+use std::sync::Once;
 use tikv_client::{request, Backoff, Config, Timestamp, TimestampExt, TransactionOptions};
+use tokio::runtime::Runtime;
 use tokio::time::Instant;
 
 use self::ffi::*;
@@ -26,6 +24,8 @@ static TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         .build()
         .expect("Failed to create TOKIO_RUNTIME")
 });
+static START: Once = Once::new();
+const DEFAULT_CHAN_SIZE: usize = 4096;
 
 #[cxx::bridge]
 mod ffi {
@@ -59,42 +59,6 @@ mod ffi {
     extern "Rust" {
         type TransactionClient;
         type Transaction;
-        type RawKVClient;
-
-        fn raw_client_new(pd_endpoints: &CxxVector<CxxString>) -> Result<Box<RawKVClient>>;
-
-        fn raw_get(client: &RawKVClient, key: &CxxString, timeout_ms: u64)
-            -> Result<OptionalValue>;
-
-        fn raw_put(
-            cli: &RawKVClient,
-            key: &CxxString,
-            val: &CxxString,
-            timeout_ms: u64,
-        ) -> Result<()>;
-
-        fn raw_scan(
-            cli: &RawKVClient,
-            start: &CxxString,
-            end: &CxxString,
-            limit: u32,
-            timeout_ms: u64,
-        ) -> Result<Vec<KvPair>>;
-
-        fn raw_delete(cli: &RawKVClient, key: &CxxString, timeout_ms: u64) -> Result<()>;
-
-        fn raw_delete_range(
-            cli: &RawKVClient,
-            startKey: &CxxString,
-            endKey: &CxxString,
-            timeout_ms: u64,
-        ) -> Result<()>;
-
-        fn raw_batch_put(
-            cli: &RawKVClient,
-            pairs: &CxxVector<KvPair>,
-            timeout_ms: u64,
-        ) -> Result<()>;
         type Snapshot;
 
         fn transaction_client_new(
@@ -223,30 +187,9 @@ struct TransactionClient {
     inner: tikv_client::TransactionClient,
 }
 
-struct RawKVClient {
-    pub rt: tokio::runtime::Runtime,
-    inner: tikv_client::RawClient,
-}
-
 #[repr(transparent)]
 struct Transaction {
     inner: tikv_client::Transaction,
-}
-
-fn raw_client_new(pd_endpoints: &CxxVector<CxxString>) -> Result<Box<RawKVClient>> {
-    // env_logger::builder()
-    //     // .filter_level(log::LevelFilter::Info)
-    //     .init();
-    let runtime = Runtime::new().unwrap();
-    let pd_endpoints = pd_endpoints
-        .iter()
-        .map(|str| str.to_str().map(ToOwned::to_owned))
-        .collect::<std::result::Result<Vec<_>, _>>()?;
-
-    Ok(Box::new(RawKVClient {
-        inner: runtime.block_on(tikv_client::RawClient::new(pd_endpoints))?,
-        rt: runtime,
-    }))
 }
 
 #[repr(transparent)]
@@ -254,45 +197,36 @@ struct Snapshot {
     inner: tikv_client::Snapshot,
 }
 
-use chrono;
-use once_cell::sync::OnceCell;
-use std::fs::OpenOptions;
-use std::sync::Once;
-static START: Once = Once::new();
-const DEFAULT_CHAN_SIZE: usize = 4096;
-fn create_slog_logger(log_path: &CxxString) -> Result<bool> {
+fn create_slog_logger(log_path: &CxxString) -> Result<slog::Logger> {
     let mut log_path = log_path.to_str()?.to_string();
-
     let log_file_name = chrono::Local::now()
         .format("/tikv-client-%Y%m%d%H%M%S.log")
         .to_string();
     log_path.push_str(&log_file_name);
-    // let file = OpenOptions::new()
-    //     .create(true)
-    //     .write(true)
-    //     .truncate(false)
-    //     .open(log_path)
-    //     .expect("open log file failed");
+    let file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(false)
+        .open(log_path)
+        .expect("open log file failed");
 
-    // let decorator = slog_term::PlainDecorator::new(file);
-    // let drain = slog_term::FullFormat::new(decorator)
-    //     .use_local_timestamp()
-    //     .build()
-    //     .fuse();
-    // let drain = slog_async::Async::new(drain)
-    //     .chan_size(DEFAULT_CHAN_SIZE)
-    //     .build()
-    //     .fuse();
-    // let logger = slog::Logger::root(drain, o!());
-    // static SCOPE_GUARD: OnceCell<slog_scope::GlobalLoggerGuard> = OnceCell::new();
-    // #[allow(unused_must_use)]
+    let decorator = slog_term::PlainDecorator::new(file);
+    let drain = slog_term::FullFormat::new(decorator)
+        .use_local_timestamp()
+        .build()
+        .fuse();
+    let drain = slog_async::Async::new(drain)
+        .chan_size(DEFAULT_CHAN_SIZE)
+        .build()
+        .fuse();
+    let logger = slog::Logger::root(drain, o!());
+    static SCOPE_GUARD: OnceCell<slog_scope::GlobalLoggerGuard> = OnceCell::new();
+    #[allow(unused_must_use)]
     START.call_once(|| {
-        // SCOPE_GUARD.set(slog_scope::set_global_logger(logger));
-        // slog_stdlog::init().unwrap();
-        env_logger::init();
+        SCOPE_GUARD.set(slog_scope::set_global_logger(logger));
+        slog_stdlog::init().unwrap();
     });
-    // Ok(slog_scope::logger())
-    Ok(true)
+    Ok(slog_scope::logger())
 }
 
 fn transaction_client_new(
@@ -300,9 +234,10 @@ fn transaction_client_new(
     log_path: &CxxString,
     timeout: u32,
 ) -> Result<Box<TransactionClient>> {
+    // env_logger::init();
     let config = Config::default();
     let config = config.with_timeout(Duration::from_secs(timeout as u64));
-    create_slog_logger(log_path)?;
+    let log = create_slog_logger(log_path)?;
     let pd_endpoints = pd_endpoints
         .iter()
         .map(|str| str.to_str().map(ToOwned::to_owned))
@@ -312,6 +247,7 @@ fn transaction_client_new(
         inner: TOKIO_RUNTIME.block_on(tikv_client::TransactionClient::new_with_config(
             pd_endpoints,
             config,
+            Some(log),
         ))?,
     }))
 }
@@ -330,7 +266,7 @@ fn transaction_client_new_with_config(
         key_path: Some(PathBuf::from(key_path.to_str()?.to_string())),
         timeout: Duration::from_secs(timeout as u64),
     };
-    create_slog_logger(log_path)?;
+    let log = create_slog_logger(log_path)?;
     let pd_endpoints = pd_endpoints
         .iter()
         .map(|str| str.to_str().map(ToOwned::to_owned))
@@ -340,6 +276,7 @@ fn transaction_client_new_with_config(
         inner: TOKIO_RUNTIME.block_on(tikv_client::TransactionClient::new_with_config(
             pd_endpoints,
             config,
+            Some(log),
         ))?,
     }))
 }
@@ -359,105 +296,6 @@ fn transaction_client_begin_pessimistic(client: &TransactionClient) -> Result<Bo
     Ok(Box::new(Transaction {
         inner: TOKIO_RUNTIME.block_on(client.inner.begin_pessimistic())?,
     }))
-}
-
-fn raw_get(cli: &RawKVClient, key: &CxxString, timeout_ms: u64) -> Result<OptionalValue> {
-    cli.rt.block_on(async {
-        let result = timeout(
-            Duration::from_millis(timeout_ms),
-            cli.inner.get(key.as_bytes().to_vec()),
-        )
-        .await??;
-        match result {
-            Some(value) => Ok(OptionalValue {
-                is_none: false,
-                value,
-            }),
-            None => Ok(OptionalValue {
-                is_none: true,
-                value: Vec::new(),
-            }),
-        }
-    })
-}
-
-fn raw_put(cli: &RawKVClient, key: &CxxString, val: &CxxString, timeout_ms: u64) -> Result<()> {
-    cli.rt.block_on(async {
-        timeout(
-            Duration::from_millis(timeout_ms),
-            cli.inner
-                .put(key.as_bytes().to_vec(), val.as_bytes().to_vec()),
-        )
-        .await??;
-        Ok(())
-    })
-}
-
-fn raw_scan(
-    cli: &RawKVClient,
-    start: &CxxString,
-    end: &CxxString,
-    limit: u32,
-    timeout_ms: u64,
-) -> Result<Vec<KvPair>> {
-    cli.rt.block_on(async {
-        let rg = to_bound_range(start, Bound::Included, end, Bound::Excluded);
-        let result =
-            timeout(Duration::from_millis(timeout_ms), cli.inner.scan(rg, limit)).await??;
-        let pairs = result
-            .into_iter()
-            .map(|tikv_client::KvPair(key, value)| KvPair {
-                key: key.into(),
-                value,
-            })
-            .collect();
-        Ok(pairs)
-    })
-}
-
-fn raw_delete(cli: &RawKVClient, key: &CxxString, timeout_ms: u64) -> Result<()> {
-    cli.rt.block_on(async {
-        timeout(
-            Duration::from_millis(timeout_ms),
-            cli.inner.delete(key.as_bytes().to_vec()),
-        )
-        .await??;
-        Ok(())
-    })
-}
-
-fn raw_delete_range(
-    cli: &RawKVClient,
-    start_key: &CxxString,
-    end_key: &CxxString,
-    timeout_ms: u64,
-) -> Result<()> {
-    cli.rt.block_on(async {
-        let rg = to_bound_range(start_key, Bound::Included, end_key, Bound::Excluded);
-        timeout(
-            Duration::from_millis(timeout_ms),
-            cli.inner.delete_range(rg),
-        )
-        .await??;
-        Ok(())
-    })
-}
-
-fn raw_batch_put(cli: &RawKVClient, pairs: &CxxVector<KvPair>, timeout_ms: u64) -> Result<()> {
-    cli.rt.block_on(async {
-        let tikv_pairs: Vec<tikv_client::KvPair> = pairs
-            .iter()
-            .map(|KvPair { key, value }| -> tikv_client::KvPair {
-                tikv_client::KvPair(key.to_vec().into(), value.to_vec())
-            })
-            .collect();
-        timeout(
-            Duration::from_millis(timeout_ms),
-            cli.inner.batch_put(tikv_pairs),
-        )
-        .await??;
-        Ok(())
-    })
 }
 
 fn transaction_client_begin_optimistic_with_option(

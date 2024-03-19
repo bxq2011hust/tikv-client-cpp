@@ -13,23 +13,22 @@ anyhow = "1"
 cxx = "=1.0.75"
 futures = "0.3"
 once_cell = "1.9.0"
-# slog = { version = "2.7.0", features = [
-#     "max_level_debug",
-#     "release_max_level_warn",
-# ] }
-# slog-async = "2.7.0"
-# slog-term = "2.9.0"
+slog = {version = "2.7.0", features = ["max_level_debug", "release_max_level_warn"] }
+slog-async = "2.7.0"
+slog-term = "2.9.0"
+slog-scope = "4.4.0"
+slog-stdlog = "4.1.1"
 log = { version = "0.4.17", features = [
     "max_level_debug",
     "release_max_level_warn",
 ] }
-slog-scope = "4.4.0"
-slog-stdlog = "4.1.1"
 chrono = "0.4.22"
-tokio = { version = "1", features = ["sync", "rt-multi-thread", "macros"] }
+grpcio = "=0.10.3"
+openssl-sys = "=0.9.75"
+tokio = { version = "=1.28.2", features = ["full"] }
 env_logger = "0.9"
 # tikv-client = { path = "../tikv-client-rust" }
-tikv-client = { git = "https://github.com/FISCO-BCOS/tikv-client-rust.git", rev = "1e3ddb2556274c9360cd159d0ac10a31f473506f" }
+tikv-client = { git = "https://github.com/FISCO-BCOS/tikv-client-rust.git", rev = "8b628485fee1871cdb15e4fc1cd8ebdbacf90541" }
 
 [build-dependencies]
 cxx-build = "1.0.18"

@@ -16,7 +16,7 @@ struct KvPair final {
   std::string value;
 
   KvPair(std::string &&key, std::string &&value);
-  ffi::KvPair to_ffi();
+  // ffi::KvPair to_ffi();
 };
 
 class Transaction {
@@ -68,7 +68,7 @@ private:
 class TransactionClient {
 public:
   TransactionClient(const std::vector<std::string> &pd_endpoints,
-                    const std::string &log_path, uint32_t grpc_timeout = 3);
+                    const std::string &log_path ="", uint32_t grpc_timeout = 3);
   TransactionClient(const std::vector<std::string> &pd_endpoints,
                     const std::string &log_path, const std::string &ca_path,
                     const std::string &cert_path, const std::string &key_path,
@@ -86,24 +86,24 @@ private:
   ::rust::cxxbridge1::Box<tikv_client_glue::TransactionClient> _client;
 };
 
-class RawKVClient {
-public:
-  RawKVClient(const std::vector<std::string> &pd_endpoints);
-  std::optional<std::string> get(const std::string &key,
-                                 const std::uint64_t timeout);
-  void put(const std::string &key, const std::string &value,
-           const std::uint64_t timeout);
-  void batch_put(const std::vector<KvPair> &kvs, const std::uint64_t timeout);
-  void remove(const std::string &key, const std::uint64_t timeout);
-  void remove_range(const std::string &start_key, const std::string &end_key,
-                    const std::uint64_t timeout);
-  std::vector<KvPair> scan(const std::string &startKey,
-                           const std::string &endKey, std::uint32_t limit,
-                           const std::uint64_t timeout);
+// class RawKVClient {
+// public:
+//   RawKVClient(const std::vector<std::string> &pd_endpoints);
+//   std::optional<std::string> get(const std::string &key,
+//                                  const std::uint64_t timeout);
+//   void put(const std::string &key, const std::string &value,
+//            const std::uint64_t timeout);
+//   void batch_put(const std::vector<KvPair> &kvs, const std::uint64_t timeout);
+//   void remove(const std::string &key, const std::uint64_t timeout);
+//   void remove_range(const std::string &start_key, const std::string &end_key,
+//                     const std::uint64_t timeout);
+//   std::vector<KvPair> scan(const std::string &startKey,
+//                            const std::string &endKey, std::uint32_t limit,
+//                            const std::uint64_t timeout);
 
-private:
-  ::rust::cxxbridge1::Box<tikv_client_glue::RawKVClient> _client;
-};
+// private:
+//   ::rust::cxxbridge1::Box<tikv_client_glue::RawKVClient> _client;
+// };
 
 } // namespace tikv_client
 
