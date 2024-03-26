@@ -24,7 +24,7 @@ chrono = "0.4.22"
 tokio = { version = "=1.28.2", features = ["full"] }
 env_logger = "0.9"
 # tikv-client = { path = "../tikv-client-rust" }
-tikv-client = { git = "https://github.com/FISCO-BCOS/tikv-client-rust.git", rev = "1d1f570a892590e9f9e6a1e3ca3eb34b18c2b30d" }
+tikv-client = { git = "https://github.com/FISCO-BCOS/tikv-client-rust.git", rev = "de5fb411a10ff92ea75d6cf382a0fdffa8c6955a" }
 
 [build-dependencies]
 cxx-build = "1.0.18"
