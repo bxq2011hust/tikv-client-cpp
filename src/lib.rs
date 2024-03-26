@@ -7,13 +7,11 @@ use std::ops;
 use anyhow::Result;
 use cxx::{CxxString, CxxVector};
 // use futures::executor::block_on;
+use log::debug;
 use tokio::{
     runtime::Runtime,
     time::{timeout, Duration},
 };
-// use futures::executor::TX_TOKIO_RUNTIME.block_on;
-use log::debug;
-use once_cell::sync::Lazy;
 // use slog::{o, Drain};
 
 use tikv_client::{request, Backoff, Config, Timestamp, TimestampExt, TransactionOptions};
@@ -21,23 +19,23 @@ use tokio::time::Instant;
 
 use self::ffi::*;
 
-static TX_TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
-    tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(4)
-        .enable_all()
-        .thread_name("transaction")
-        .build()
-        .expect("Failed to create TOKIO_RUNTIME")
-});
-
-static SNAPSHOT_TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
-    tokio::runtime::Builder::new_current_thread()
-        .worker_threads(4)
-        .enable_all()
-        .thread_name("snapshot")
-        .build()
-        .expect("Failed to create TOKIO_RUNTIME")
-});
+// use once_cell::sync::Lazy;
+// static TX_TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
+//     tokio::runtime::Builder::new_multi_thread()
+//         .worker_threads(4)
+//         .enable_all()
+//         .thread_name("transaction")
+//         .build()
+//         .expect("Failed to create TOKIO_RUNTIME")
+// });
+// static SNAPSHOT_TOKIO_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
+//     tokio::runtime::Builder::new_current_thread()
+//         .worker_threads(4)
+//         .enable_all()
+//         .thread_name("snapshot")
+//         .build()
+//         .expect("Failed to create TOKIO_RUNTIME")
+// });
 
 #[cxx::bridge]
 mod ffi {
@@ -241,9 +239,9 @@ struct RawKVClient {
     inner: tikv_client::RawClient,
 }
 
-#[repr(transparent)]
 struct Transaction {
     inner: tikv_client::Transaction,
+    rt: tokio::runtime::Handle,
 }
 
 fn raw_client_new(pd_endpoints: &CxxVector<CxxString>) -> Result<Box<RawKVClient>> {
@@ -262,9 +260,9 @@ fn raw_client_new(pd_endpoints: &CxxVector<CxxString>) -> Result<Box<RawKVClient
     }))
 }
 
-#[repr(transparent)]
 struct Snapshot {
     inner: tikv_client::Snapshot,
+    rt: tokio::runtime::Handle,
 }
 
 use chrono;
@@ -273,7 +271,7 @@ use chrono;
 use std::sync::Once;
 static START: Once = Once::new();
 // const DEFAULT_CHAN_SIZE: usize = 4096;
-fn create_slog_logger(log_path: &CxxString) -> Result<bool> {
+fn create_logger(log_path: &CxxString) -> Result<bool> {
     let mut log_path = log_path.to_str()?.to_string();
 
     let log_file_name = chrono::Local::now()
@@ -315,7 +313,7 @@ fn transaction_client_new(
 ) -> Result<Box<TransactionClient>> {
     let config = Config::default();
     let config = config.with_timeout(Duration::from_secs(timeout as u64));
-    create_slog_logger(log_path)?;
+    create_logger(log_path)?;
     let pd_endpoints = pd_endpoints
         .iter()
         .map(|str| str.to_str().map(ToOwned::to_owned))
@@ -351,7 +349,7 @@ fn transaction_client_new_with_config(
     //     key_path: Some(PathBuf::from(key_path.to_str()?.to_string())),
     //     timeout: Duration::from_secs(timeout as u64),
     // };
-    create_slog_logger(log_path)?;
+    create_logger(log_path)?;
     let pd_endpoints = pd_endpoints
         .iter()
         .map(|str| str.to_str().map(ToOwned::to_owned))
@@ -375,12 +373,14 @@ fn client_gc(client: &TransactionClient, safepoint: u64) -> Result<bool> {
 fn transaction_client_begin(client: &TransactionClient) -> Result<Box<Transaction>> {
     Ok(Box::new(Transaction {
         inner: client.rt.block_on(client.inner.begin_optimistic())?,
+        rt: client.rt.handle().clone(),
     }))
 }
 
 fn transaction_client_begin_pessimistic(client: &TransactionClient) -> Result<Box<Transaction>> {
     Ok(Box::new(Transaction {
         inner: client.rt.block_on(client.inner.begin_pessimistic())?,
+        rt: client.rt.handle().clone(),
     }))
 }
 
@@ -491,16 +491,20 @@ fn transaction_client_begin_optimistic_with_option(
     let mut retry_options = request::RetryOptions::default_optimistic();
     retry_options.lock_backoff = Backoff::no_jitter_backoff(2, 500, retry);
     let options = options.retry_options(retry_options);
-    let timestamp = TX_TOKIO_RUNTIME.block_on(client.inner.current_timestamp())?;
+    let timestamp = client.rt.block_on(client.inner.current_timestamp())?;
     Ok(Box::new(Transaction {
         inner: client
             .inner
             .new_transaction_with_options(timestamp, options),
+        rt: client.rt.handle().clone(),
     }))
 }
 
 fn transaction_get(transaction: &mut Transaction, key: &CxxString) -> Result<OptionalValue> {
-    match TX_TOKIO_RUNTIME.block_on(transaction.inner.get(key.as_bytes().to_owned()))? {
+    match transaction
+        .rt
+        .block_on(transaction.inner.get(key.as_bytes().to_owned()))?
+    {
         Some(value) => Ok(OptionalValue {
             is_none: false,
             value,
@@ -516,7 +520,10 @@ fn transaction_get_for_update(
     transaction: &mut Transaction,
     key: &CxxString,
 ) -> Result<OptionalValue> {
-    match TX_TOKIO_RUNTIME.block_on(transaction.inner.get_for_update(key.as_bytes().to_owned()))? {
+    match transaction
+        .rt
+        .block_on(transaction.inner.get_for_update(key.as_bytes().to_owned()))?
+    {
         Some(value) => Ok(OptionalValue {
             is_none: false,
             value,
@@ -533,7 +540,8 @@ fn transaction_batch_get(
     keys: &CxxVector<CxxString>,
 ) -> Result<Vec<KvPair>> {
     let keys = keys.iter().map(|key| key.as_bytes().to_owned());
-    let kv_pairs = TX_TOKIO_RUNTIME
+    let kv_pairs = transaction
+        .rt
         .block_on(transaction.inner.batch_get(keys))?
         .map(|tikv_client::KvPair(key, value)| KvPair {
             key: key.into(),
@@ -548,7 +556,7 @@ fn transaction_batch_get_for_update(
     _keys: &CxxVector<CxxString>,
 ) -> Result<Vec<KvPair>> {
     // let keys = keys.iter().map(|key| key.as_bytes().to_owned());
-    // let kv_pairs = TX_TOKIO_RUNTIME.block_on(transaction.inner.batch_get_for_update(keys))?
+    // let kv_pairs = transaction.rt.block_on(transaction.inner.batch_get_for_update(keys))?
     //     .map(|tikv_client::KvPair(key, value)| KvPair {
     //         key: key.into(),
     //         value,
@@ -567,7 +575,8 @@ fn transaction_scan(
     limit: u32,
 ) -> Result<Vec<KvPair>> {
     let range = to_bound_range(start, start_bound, end, end_bound);
-    let kv_pairs = TX_TOKIO_RUNTIME
+    let kv_pairs = transaction
+        .rt
         .block_on(transaction.inner.scan(range, limit))?
         .map(|tikv_client::KvPair(key, value)| KvPair {
             key: key.into(),
@@ -586,7 +595,8 @@ fn transaction_scan_keys(
     limit: u32,
 ) -> Result<Vec<Key>> {
     let range = to_bound_range(start, start_bound, end, end_bound);
-    let keys = TX_TOKIO_RUNTIME
+    let keys = transaction
+        .rt
         .block_on(transaction.inner.scan_keys(range, limit))?
         .map(|key| Key { key: key.into() })
         .collect();
@@ -594,7 +604,7 @@ fn transaction_scan_keys(
 }
 
 fn transaction_put(transaction: &mut Transaction, key: &CxxString, val: &CxxString) -> Result<()> {
-    TX_TOKIO_RUNTIME.block_on(
+    transaction.rt.block_on(
         transaction
             .inner
             .put(key.as_bytes().to_owned(), val.as_bytes().to_owned()),
@@ -603,17 +613,19 @@ fn transaction_put(transaction: &mut Transaction, key: &CxxString, val: &CxxStri
 }
 
 fn transaction_delete(transaction: &mut Transaction, key: &CxxString) -> Result<()> {
-    TX_TOKIO_RUNTIME.block_on(transaction.inner.delete(key.as_bytes().to_owned()))?;
+    transaction
+        .rt
+        .block_on(transaction.inner.delete(key.as_bytes().to_owned()))?;
     Ok(())
 }
 
 fn transaction_commit(transaction: &mut Transaction) -> Result<()> {
-    TX_TOKIO_RUNTIME.block_on(transaction.inner.commit())?;
+    transaction.rt.block_on(transaction.inner.commit())?;
     Ok(())
 }
 
 fn transaction_rollback(transaction: &mut Transaction) -> Result<()> {
-    TX_TOKIO_RUNTIME.block_on(transaction.inner.rollback())?;
+    transaction.rt.block_on(transaction.inner.rollback())?;
     Ok(())
 }
 
@@ -627,7 +639,10 @@ fn transaction_prewrite_primary(
     } else {
         Some(primary_key.as_bytes().to_owned().into())
     };
-    match TX_TOKIO_RUNTIME.block_on(transaction.inner.prewrite_primary(primary_key)) {
+    match transaction
+        .rt
+        .block_on(transaction.inner.prewrite_primary(primary_key))
+    {
         Ok((key, ts)) => Ok({
             debug!("prewrite primary time {:?}", start.elapsed());
             PrewriteResult {
@@ -648,17 +663,19 @@ fn transaction_prewrite_secondary(
     start_ts: u64,
 ) -> Result<()> {
     let start = Instant::now();
-    TX_TOKIO_RUNTIME.block_on(transaction.inner.prewrite_secondary(
-        primary_key.as_bytes().to_owned().into(),
-        tikv_client::Timestamp::from_version(start_ts),
-    ))?;
+    transaction
+        .rt
+        .block_on(transaction.inner.prewrite_secondary(
+            primary_key.as_bytes().to_owned().into(),
+            tikv_client::Timestamp::from_version(start_ts),
+        ))?;
     debug!("prewrite secondary time {:?}", start.elapsed());
     Ok(())
 }
 
 fn transaction_commit_primary(transaction: &mut Transaction) -> Result<u64> {
     let start = Instant::now();
-    match TX_TOKIO_RUNTIME.block_on(transaction.inner.commit_primary()) {
+    match transaction.rt.block_on(transaction.inner.commit_primary()) {
         Ok(ts) => {
             debug!("commit primary time {:?}", start.elapsed());
             Ok(ts.version())
@@ -668,8 +685,8 @@ fn transaction_commit_primary(transaction: &mut Transaction) -> Result<u64> {
 }
 
 fn transaction_commit_secondary(transaction: &mut Transaction, commit_ts: u64) {
-    let start = Instant::now();
-    TX_TOKIO_RUNTIME.block_on(
+    let start: Instant = Instant::now();
+    transaction.rt.block_on(
         transaction
             .inner
             .commit_secondary(tikv_client::Timestamp::from_version(commit_ts)),
@@ -708,6 +725,7 @@ fn snapshot_new(client: &TransactionClient, is_optimistic: bool) -> Result<Box<S
                 false => TransactionOptions::new_pessimistic(),
             },
         ),
+        rt: client.rt.handle().clone(),
     }))
 }
 
@@ -720,6 +738,7 @@ fn snapshot_new_with_timestamp(
         inner: client
             .inner
             .snapshot(timestamp, TransactionOptions::new_optimistic()),
+        rt: client.rt.handle().clone(),
     }))
 }
 
@@ -729,7 +748,10 @@ fn current_timestamp(client: &TransactionClient) -> Result<u64> {
 }
 
 fn snapshot_get(snapshot: &mut Snapshot, key: &CxxString) -> Result<OptionalValue> {
-    match SNAPSHOT_TOKIO_RUNTIME.block_on(snapshot.inner.get(key.as_bytes().to_owned()))? {
+    match snapshot
+        .rt
+        .block_on(snapshot.inner.get(key.as_bytes().to_owned()))?
+    {
         Some(value) => Ok(OptionalValue {
             is_none: false,
             value,
@@ -743,7 +765,8 @@ fn snapshot_get(snapshot: &mut Snapshot, key: &CxxString) -> Result<OptionalValu
 
 fn snapshot_batch_get(snapshot: &mut Snapshot, keys: &CxxVector<CxxString>) -> Result<Vec<KvPair>> {
     let keys = keys.iter().map(|key| key.as_bytes().to_owned());
-    let kv_pairs = SNAPSHOT_TOKIO_RUNTIME
+    let kv_pairs = snapshot
+        .rt
         .block_on(snapshot.inner.batch_get(keys))?
         .map(|tikv_client::KvPair(key, value)| KvPair {
             key: key.into(),
@@ -762,7 +785,8 @@ fn snapshot_scan(
     limit: u32,
 ) -> Result<Vec<KvPair>> {
     let range = to_bound_range(start, start_bound, end, end_bound);
-    let kv_pairs = SNAPSHOT_TOKIO_RUNTIME
+    let kv_pairs = snapshot
+        .rt
         .block_on(snapshot.inner.scan(range, limit))?
         .map(|tikv_client::KvPair(key, value)| KvPair {
             key: key.into(),
@@ -781,7 +805,8 @@ fn snapshot_scan_keys(
     limit: u32,
 ) -> Result<Vec<Key>> {
     let range = to_bound_range(start, start_bound, end, end_bound);
-    let keys = SNAPSHOT_TOKIO_RUNTIME
+    let keys = snapshot
+        .rt
         .block_on(snapshot.inner.scan_keys(range, limit))?
         .map(|key| Key { key: key.into() })
         .collect();
